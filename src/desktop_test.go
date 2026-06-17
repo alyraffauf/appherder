@@ -3,24 +3,23 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
 const sampleDesktopFile = `# leading comment
 [Desktop Entry]
-Name=Helium
-Exec=env FOO=bar helium %U
-Icon=helium
+Name=Example App
+Exec=env FOO=bar upstream-app %U
+Icon=example-app
 Actions=new-window;new-private-window;
 
 [Desktop Action new-window]
 Name=New Window
-Exec=helium --new-window %U
+Exec=upstream-app --new-window %U
 
 [Desktop Action new-private-window]
 Name=New Private Window
-Exec=helium --private-window %U
+Exec=upstream-app --private-window %U
 `
 
 func TestDesktopFileRoundTripMatchesInput(t *testing.T) {
@@ -62,28 +61,44 @@ func TestPatchDesktopFilePreservesDesktopActions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := a.patchDesktopFile(desktop, "helium"); err != nil {
+	if err := a.patchDesktopFile(desktop, "example"); err != nil {
 		t.Fatal(err)
 	}
 	if err := desktop.write(output); err != nil {
 		t.Fatal(err)
 	}
 
-	written, err := os.ReadFile(output)
+	patched, err := readDesktopFile(output)
 	if err != nil {
 		t.Fatal(err)
 	}
-	text := string(written)
-	for _, expected := range []string{
-		"[Desktop Action new-window]",
-		"[Desktop Action new-private-window]",
-		"Name=New Private Window",
-		"Exec=env FOO=bar DESKTOPINTEGRATION=1 /home/test/AppImages/helium.appimage %U",
-		"Exec=env DESKTOPINTEGRATION=1 /home/test/AppImages/helium.appimage --new-window %U",
-		"Exec=env DESKTOPINTEGRATION=1 /home/test/AppImages/helium.appimage --private-window %U",
-	} {
-		if !strings.Contains(text, expected) {
-			t.Fatalf("patched desktop file missing %q:\n%s", expected, text)
-		}
+
+	assertDesktopValue(t, patched, desktopEntrySection, "Icon", "/home/test/AppImages/.icons/example")
+	assertDesktopValue(t, patched, desktopEntrySection, "TryExec", "/home/test/AppImages/example.appimage")
+	assertDesktopExec(t, patched, desktopEntrySection, []string{"env", "FOO=bar", "DESKTOPINTEGRATION=1", "/home/test/AppImages/example.appimage", "%U"})
+	assertDesktopExec(t, patched, "Desktop Action new-window", []string{"env", "DESKTOPINTEGRATION=1", "/home/test/AppImages/example.appimage", "--new-window", "%U"})
+	assertDesktopExec(t, patched, "Desktop Action new-private-window", []string{"env", "DESKTOPINTEGRATION=1", "/home/test/AppImages/example.appimage", "--private-window", "%U"})
+	assertDesktopValue(t, patched, "Desktop Action new-private-window", "Name", "New Private Window")
+}
+
+func assertDesktopValue(t *testing.T, desktop *desktopFile, section string, key string, want string) {
+	t.Helper()
+
+	got, ok := desktop.get(key, section)
+	if !ok {
+		t.Fatalf("missing %s in section %s", key, section)
 	}
+	if got != want {
+		t.Fatalf("%s/%s = %q, want %q", section, key, got, want)
+	}
+}
+
+func assertDesktopExec(t *testing.T, desktop *desktopFile, section string, want []string) {
+	t.Helper()
+
+	execCmd, ok := desktop.get("Exec", section)
+	if !ok {
+		t.Fatalf("missing Exec in section %s", section)
+	}
+	assertTokens(t, mustSplit(t, execCmd), want)
 }
