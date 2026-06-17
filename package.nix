@@ -7,9 +7,5 @@ buildGoModule {
   version = "dev";
   src = ./.;
   vendorHash = "sha256-Q+emMKLlnoRlYIe2nNZ6NKkg6bao1xj8CARkv5uiZRs=";
-  subPackages = ["src"];
-
-  postInstall = ''
-    mv "$out/bin/src" "$out/bin/appherder"
-  '';
+  subPackages = ["cmd/appherder"];
 }
