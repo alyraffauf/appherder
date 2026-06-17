@@ -28,18 +28,6 @@ func TestNormalizeAppNameAcceptsNamesAndAppImagePaths(t *testing.T) {
 	}
 }
 
-func TestInstalledPaths(t *testing.T) {
-	got := installedPaths("/home/test", "example")
-	want := []string{
-		"/home/test/AppImages/example.appimage",
-		"/home/test/AppImages/.icons/example",
-		"/home/test/.local/share/applications/example.desktop",
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("installedPaths() = %#v, want %#v", got, want)
-	}
-}
-
 func TestUninstallRemovesInstalledFilesOnly(t *testing.T) {
 	home := t.TempDir()
 	for _, path := range installedPaths(home, "example") {

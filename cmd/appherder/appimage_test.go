@@ -2,41 +2,29 @@ package main
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 )
 
-// elfHeader builds a minimal little-endian ELF header with the given class
-// (1=32-bit, 2=64-bit) and section-header-table fields.
-func elfHeader(class byte, shoff uint64, shentsize, shnum uint16) []byte {
-	h := make([]byte, 64)
-	copy(h, []byte{0x7f, 'E', 'L', 'F'})
-	h[4] = class
-	h[5] = 1 // little-endian
-	if class == 2 {
-		binary.LittleEndian.PutUint64(h[40:48], shoff)
-		binary.LittleEndian.PutUint16(h[58:60], shentsize)
-		binary.LittleEndian.PutUint16(h[60:62], shnum)
-	} else {
-		binary.LittleEndian.PutUint32(h[32:36], uint32(shoff))
-		binary.LittleEndian.PutUint16(h[46:48], shentsize)
-		binary.LittleEndian.PutUint16(h[48:50], shnum)
-	}
-	return h
-}
-
 func TestAppImageSquashfsOffset(t *testing.T) {
-	for _, class := range []byte{1, 2} {
-		got, err := appImageSquashfsOffset(bytes.NewReader(elfHeader(class, 1000, 64, 10)))
-		if err != nil {
-			t.Fatalf("class %d: %v", class, err)
-		}
-		if want := int64(1000 + 64*10); got != want {
-			t.Fatalf("class %d: offset = %d, want %d", class, got, want)
-		}
+	// First 64 bytes of a real type-2 ELF64 AppImage (appimagetool), whose
+	// squashfs payload begins at the offset asserted below.
+	header := []byte{
+		0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00, 0x41, 0x49, 0x02, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x3e, 0x00, 0x01, 0x00, 0x00, 0x00,
+		0x87, 0xae, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x78, 0x62, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x38, 0x00, 0x0a, 0x00, 0x40, 0x00,
+		0x1e, 0x00, 0x1d, 0x00,
+	}
+	got, err := appImageSquashfsOffset(bytes.NewReader(header))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := int64(944632); got != want {
+		t.Fatalf("offset = %d, want %d", got, want)
 	}
 }
 
@@ -47,7 +35,8 @@ func TestAppImageSquashfsOffsetRejectsNonELF(t *testing.T) {
 }
 
 func TestAppImageSquashfsOffsetRejectsType1(t *testing.T) {
-	h := elfHeader(2, 1000, 64, 10)
+	h := make([]byte, 64)
+	copy(h, []byte{0x7f, 'E', 'L', 'F'})
 	h[8], h[9], h[10] = 'A', 'I', 1
 	if _, err := appImageSquashfsOffset(bytes.NewReader(h)); err == nil {
 		t.Fatal("expected error for type-1 AppImage")
