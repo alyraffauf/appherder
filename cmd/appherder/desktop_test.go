@@ -87,12 +87,15 @@ func TestFindDesktopFileSkipsDefault(t *testing.T) {
 		"default.desktop": {Data: []byte("[Desktop Entry]\nName=Default\n")},
 		"app.desktop":     {Data: []byte("[Desktop Entry]\nName=App\n")},
 	}
-	desktop, err := findDesktopFile(fsys)
+	desktop, name, err := findDesktopFile(fsys)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if desktop == nil {
 		t.Fatal("expected a desktop file")
+	}
+	if name != "app.desktop" {
+		t.Fatalf("desktop name = %q, want app.desktop", name)
 	}
 	assertDesktopValue(t, desktop, desktopEntrySection, "Name", "App")
 }
@@ -101,12 +104,21 @@ func TestFindDesktopFileReturnsNilWhenOnlyDefault(t *testing.T) {
 	fsys := fstest.MapFS{
 		"default.desktop": {Data: []byte("[Desktop Entry]\nName=Default\n")},
 	}
-	desktop, err := findDesktopFile(fsys)
+	desktop, name, err := findDesktopFile(fsys)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if desktop != nil {
-		t.Fatal("expected nil desktop file")
+	if desktop != nil || name != "" {
+		t.Fatalf("expected no desktop file, got %v %q", desktop, name)
+	}
+}
+
+func TestDeriveAppName(t *testing.T) {
+	if got := deriveAppName("org.kde.krita.desktop", "/dl/krita-5.2.0-x86_64.appimage"); got != "org.kde.krita" {
+		t.Fatalf("deriveAppName with desktop = %q, want org.kde.krita", got)
+	}
+	if got := deriveAppName("", "/dl/Krita-5.2.0-x86_64.AppImage"); got != "Krita-5.2.0-x86_64" {
+		t.Fatalf("deriveAppName fallback = %q, want Krita-5.2.0-x86_64", got)
 	}
 }
 

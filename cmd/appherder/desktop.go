@@ -42,13 +42,13 @@ type desktopFile struct {
 	trailingNewline bool
 }
 
-// findDesktopFile returns the AppImage's desktop entry, skipping the AppImage
-// runtime's default.desktop. The "*.desktop" glob only matches the root, so
-// candidates are bare filenames.
-func findDesktopFile(fsys fs.FS) (*desktopFile, error) {
+// findDesktopFile returns the AppImage's desktop entry and its filename,
+// skipping the AppImage runtime's default.desktop. The "*.desktop" glob only
+// matches the root, so candidates are bare filenames.
+func findDesktopFile(fsys fs.FS) (*desktopFile, string, error) {
 	candidates, err := fs.Glob(fsys, "*.desktop")
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	sort.Strings(candidates)
 
@@ -58,12 +58,12 @@ func findDesktopFile(fsys fs.FS) (*desktopFile, error) {
 		}
 		data, err := fs.ReadFile(fsys, candidate)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
-		return parseDesktopFile(data), nil
+		return parseDesktopFile(data), candidate, nil
 	}
 
-	return nil, nil
+	return nil, "", nil
 }
 
 func readDesktopFile(path string) (*desktopFile, error) {

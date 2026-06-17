@@ -26,13 +26,13 @@ func (a app) install(appimage string) (err error) {
 		}
 	}()
 
-	desktop, err := findDesktopFile(fsys)
+	desktop, desktopName, err := findDesktopFile(fsys)
 	if err != nil {
 		return fmt.Errorf("find desktop file: %w", err)
 	}
 
 	icon := resolveIcon(fsys)
-	appName := appNameFromPath(appimage)
+	appName := deriveAppName(desktopName, appimage)
 
 	// Patch in memory before any filesystem writes so a failure here installs nothing.
 	if desktop != nil {
@@ -75,6 +75,15 @@ func (a app) install(appimage string) (err error) {
 	}
 
 	return nil
+}
+
+// deriveAppName prefers the AppImage's desktop-file id, which is stable across
+// versions, and falls back to the source filename when no desktop entry ships.
+func deriveAppName(desktopName string, appimagePath string) string {
+	if name := strings.TrimSuffix(desktopName, ".desktop"); name != "" {
+		return name
+	}
+	return appNameFromPath(appimagePath)
 }
 
 func appNameFromPath(path string) string {
