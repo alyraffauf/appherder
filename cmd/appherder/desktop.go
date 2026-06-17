@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -237,10 +236,7 @@ func (d *desktopFile) write(path string) error {
 	if d.trailingNewline {
 		text += "\n"
 	}
-	return writeAtomic(path, 0o644, func(w io.Writer) error {
-		_, err := w.Write([]byte(text))
-		return err
-	})
+	return writeIfChanged(path, 0o644, []byte(text))
 }
 
 func (a app) patchDesktopFile(desktop *desktopFile, appName string, hasIcon bool) error {

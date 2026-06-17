@@ -10,6 +10,22 @@ import (
 	"path/filepath"
 )
 
+// writeIfChanged writes content to path atomically, but skips when path
+// already holds identical bytes so the file's mtime stays stable.
+func writeIfChanged(path string, perm os.FileMode, content []byte) error {
+	if existing, err := os.ReadFile(path); err == nil {
+		if bytes.Equal(existing, content) {
+			return nil
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return writeAtomic(path, perm, func(w io.Writer) error {
+		_, err := w.Write(content)
+		return err
+	})
+}
+
 // writeAtomic writes via a temp file beside path and renames it into place, so
 // path never holds a partially written file.
 func writeAtomic(path string, perm os.FileMode, write func(io.Writer) error) (err error) {
@@ -81,14 +97,9 @@ func fileHash(path string) ([]byte, error) {
 }
 
 func copyFromFS(fsys fs.FS, name string, dest string) error {
-	in, err := fsys.Open(name)
+	content, err := fs.ReadFile(fsys, name)
 	if err != nil {
 		return err
 	}
-	defer in.Close()
-
-	return writeAtomic(dest, 0o644, func(w io.Writer) error {
-		_, err := io.Copy(w, in)
-		return err
-	})
+	return writeIfChanged(dest, 0o644, content)
 }
