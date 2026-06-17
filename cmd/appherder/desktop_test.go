@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"testing/fstest"
 )
 
 const sampleDesktopFile = `# leading comment
@@ -79,6 +80,34 @@ func TestPatchDesktopFilePreservesDesktopActions(t *testing.T) {
 	assertDesktopExec(t, patched, "Desktop Action new-window", []string{"env", "DESKTOPINTEGRATION=1", "/home/test/AppImages/example.appimage", "--new-window", "%U"})
 	assertDesktopExec(t, patched, "Desktop Action new-private-window", []string{"env", "DESKTOPINTEGRATION=1", "/home/test/AppImages/example.appimage", "--private-window", "%U"})
 	assertDesktopValue(t, patched, "Desktop Action new-private-window", "Name", "New Private Window")
+}
+
+func TestFindDesktopFileSkipsDefault(t *testing.T) {
+	fsys := fstest.MapFS{
+		"default.desktop": {Data: []byte("[Desktop Entry]\nName=Default\n")},
+		"app.desktop":     {Data: []byte("[Desktop Entry]\nName=App\n")},
+	}
+	desktop, err := findDesktopFile(fsys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if desktop == nil {
+		t.Fatal("expected a desktop file")
+	}
+	assertDesktopValue(t, desktop, desktopEntrySection, "Name", "App")
+}
+
+func TestFindDesktopFileReturnsNilWhenOnlyDefault(t *testing.T) {
+	fsys := fstest.MapFS{
+		"default.desktop": {Data: []byte("[Desktop Entry]\nName=Default\n")},
+	}
+	desktop, err := findDesktopFile(fsys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if desktop != nil {
+		t.Fatal("expected nil desktop file")
+	}
 }
 
 func assertDesktopValue(t *testing.T, desktop *desktopFile, section string, key string, want string) {

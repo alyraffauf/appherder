@@ -1,3 +1,4 @@
 squashfs-root/
 *.appimage
 /appherder
+/result

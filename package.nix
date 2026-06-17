@@ -6,6 +6,6 @@ buildGoModule {
   pname = "appherder";
   version = "dev";
   src = ./.;
-  vendorHash = "sha256-Q+emMKLlnoRlYIe2nNZ6NKkg6bao1xj8CARkv5uiZRs=";
+  vendorHash = "sha256-cnxgWLpc8l/dvJHgj1PkJrSYmsH88pCTISM+pf7Ulg4=";
   subPackages = ["cmd/appherder"];
 }

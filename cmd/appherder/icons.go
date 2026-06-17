@@ -4,26 +4,27 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 )
 
 // resolveIcon prefers .DirIcon, then any icon at the AppImage root, then icons
-// in the standard theme directories. It returns "" when none is found.
-func resolveIcon(extracted string) string {
-	dirIcon := filepath.Join(extracted, ".DirIcon")
-	if info, err := os.Stat(dirIcon); err == nil && !info.IsDir() {
-		return dirIcon
+// in the standard theme directories. It returns the in-archive path, or "" when
+// none is found.
+func resolveIcon(fsys fs.FS) string {
+	if info, err := fs.Stat(fsys, ".DirIcon"); err == nil && !info.IsDir() {
+		return ".DirIcon"
 	}
-	return findFallbackIcon(extracted)
+	return findFallbackIcon(fsys)
 }
 
-func findFallbackIcon(extracted string) string {
+func findFallbackIcon(fsys fs.FS) string {
 	best := ""
 	bestRank := -1
 	var bestSize int64
-	consider := func(path string, entry fs.DirEntry) {
-		rank := iconRank(path)
+	consider := func(name string, entry fs.DirEntry) {
+		rank := iconRank(name)
 		if rank < 0 {
 			return
 		}
@@ -33,27 +34,24 @@ func findFallbackIcon(extracted string) string {
 		}
 		// Prefer the higher-ranked extension, then the larger (higher-res) file.
 		if size := info.Size(); rank > bestRank || (rank == bestRank && size > bestSize) {
-			best, bestRank, bestSize = path, rank, size
+			best, bestRank, bestSize = name, rank, size
 		}
 	}
 
-	if entries, err := os.ReadDir(extracted); err == nil {
+	if entries, err := fs.ReadDir(fsys, "."); err == nil {
 		for _, entry := range entries {
 			if !entry.IsDir() {
-				consider(filepath.Join(extracted, entry.Name()), entry)
+				consider(entry.Name(), entry)
 			}
 		}
 	}
 
-	for _, dir := range []string{
-		filepath.Join(extracted, "usr", "share", "icons"),
-		filepath.Join(extracted, "usr", "share", "pixmaps"),
-	} {
-		_ = filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
+	for _, dir := range []string{"usr/share/icons", "usr/share/pixmaps"} {
+		_ = fs.WalkDir(fsys, dir, func(name string, entry fs.DirEntry, err error) error {
 			if err != nil || entry.IsDir() {
 				return nil
 			}
-			consider(path, entry)
+			consider(name, entry)
 			return nil
 		})
 	}
@@ -62,8 +60,8 @@ func findFallbackIcon(extracted string) string {
 }
 
 // iconRank ranks icon extensions (higher preferred); -1 means not an icon.
-func iconRank(path string) int {
-	switch strings.ToLower(filepath.Ext(path)) {
+func iconRank(name string) int {
+	switch strings.ToLower(path.Ext(name)) {
 	case ".svg":
 		return 2
 	case ".png":
@@ -75,7 +73,7 @@ func iconRank(path string) int {
 	}
 }
 
-func (a app) installIcon(icon string, appName string) (string, error) {
+func (a app) installIcon(fsys fs.FS, icon string, appName string) (string, error) {
 	home, err := a.homeDir()
 	if err != nil {
 		return "", fmt.Errorf("resolve home directory: %w", err)
@@ -87,7 +85,7 @@ func (a app) installIcon(icon string, appName string) (string, error) {
 	}
 
 	dest := filepath.Join(iconsDir, appName)
-	if err := copyFile(icon, dest); err != nil {
+	if err := copyFromFS(fsys, icon, dest); err != nil {
 		return "", fmt.Errorf("install icon %s to %s: %w", icon, dest, err)
 	}
 	return dest, nil

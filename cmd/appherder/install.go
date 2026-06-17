@@ -7,29 +7,31 @@ import (
 	"strings"
 )
 
-func (a app) install(appimage string) error {
-	appimage, err := filepath.Abs(appimage)
+func (a app) install(appimage string) (err error) {
+	appimage, err = filepath.Abs(appimage)
 	if err != nil {
 		return fmt.Errorf("resolve AppImage path %q: %w", appimage, err)
 	}
 
-	tmp, err := os.MkdirTemp("", "appherder-")
-	if err != nil {
-		return fmt.Errorf("create extraction directory: %w", err)
-	}
-	defer os.RemoveAll(tmp)
-
-	extracted, err := a.extractAppImage(appimage, tmp)
+	fsys, closeAppImage, err := openAppImage(appimage)
 	if err != nil {
 		return err
 	}
+	defer closeAppImage()
 
-	desktop, err := findDesktopFile(extracted)
+	// The squashfs reader parses untrusted input; turn any panic into an error.
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("read AppImage %s: %v", appimage, r)
+		}
+	}()
+
+	desktop, err := findDesktopFile(fsys)
 	if err != nil {
-		return fmt.Errorf("find desktop file in %s: %w", extracted, err)
+		return fmt.Errorf("find desktop file: %w", err)
 	}
 
-	icon := resolveIcon(extracted)
+	icon := resolveIcon(fsys)
 	appName := appNameFromPath(appimage)
 
 	// Patch in memory before any filesystem writes so a failure here installs nothing.
@@ -48,7 +50,7 @@ func (a app) install(appimage string) error {
 	}
 
 	if icon != "" {
-		dest, err := a.installIcon(icon, appName)
+		dest, err := a.installIcon(fsys, icon, appName)
 		if err != nil {
 			rollback()
 			return err

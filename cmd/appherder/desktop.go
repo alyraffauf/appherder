@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -41,22 +42,25 @@ type desktopFile struct {
 	trailingNewline bool
 }
 
-func findDesktopFile(extracted string) (*desktopFile, error) {
-	candidates, err := filepath.Glob(filepath.Join(extracted, "*.desktop"))
+// findDesktopFile returns the AppImage's desktop entry, skipping the AppImage
+// runtime's default.desktop. The "*.desktop" glob only matches the root, so
+// candidates are bare filenames.
+func findDesktopFile(fsys fs.FS) (*desktopFile, error) {
+	candidates, err := fs.Glob(fsys, "*.desktop")
 	if err != nil {
 		return nil, err
 	}
 	sort.Strings(candidates)
 
 	for _, candidate := range candidates {
-		if filepath.Base(candidate) == "default.desktop" {
+		if candidate == "default.desktop" {
 			continue
 		}
-		desktop, err := readDesktopFile(candidate)
+		data, err := fs.ReadFile(fsys, candidate)
 		if err != nil {
 			return nil, err
 		}
-		return desktop, nil
+		return parseDesktopFile(data), nil
 	}
 
 	return nil, nil
@@ -67,7 +71,10 @@ func readDesktopFile(path string) (*desktopFile, error) {
 	if err != nil {
 		return nil, err
 	}
+	return parseDesktopFile(data), nil
+}
 
+func parseDesktopFile(data []byte) *desktopFile {
 	text := string(data)
 	body := strings.TrimSuffix(text, "\n")
 	lines := []string{}
@@ -108,7 +115,7 @@ func readDesktopFile(path string) (*desktopFile, error) {
 		})
 	}
 
-	return desktop, nil
+	return desktop
 }
 
 func (d *desktopFile) section(name string) *desktopSection {

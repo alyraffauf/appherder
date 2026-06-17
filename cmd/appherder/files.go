@@ -2,6 +2,7 @@ package main
 
 import (
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -33,8 +34,15 @@ func writeAtomic(path string, perm os.FileMode, write func(io.Writer) error) (er
 	return os.Rename(tmpName, path)
 }
 
-func copyFile(src string, dest string) error {
+func copyFromFS(fsys fs.FS, name string, dest string) error {
+	in, err := fsys.Open(name)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
 	return writeAtomic(dest, 0o644, func(w io.Writer) error {
-		return copyTo(src, w)
+		_, err := io.Copy(w, in)
+		return err
 	})
 }
