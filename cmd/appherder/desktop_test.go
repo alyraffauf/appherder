@@ -115,11 +115,25 @@ func TestFindDesktopFileReturnsNilWhenOnlyDefault(t *testing.T) {
 }
 
 func TestDeriveAppName(t *testing.T) {
-	if got := deriveAppName("org.kde.krita.desktop", "/dl/krita-5.2.0-x86_64.appimage"); got != "org.kde.krita" {
-		t.Fatalf("deriveAppName with desktop = %q, want org.kde.krita", got)
+	tests := []struct {
+		name         string
+		desktop      *desktopFile
+		desktopName  string
+		appimagePath string
+		want         string
+	}{
+		{"Name with hyphen", parseDesktopFile([]byte("[Desktop Entry]\nName=ES-DE\n")), "org.es_de.frontend.desktop", "", "esde"},
+		{"Name with spaces", parseDesktopFile([]byte("[Desktop Entry]\nName=Visual Studio Code\n")), "code.desktop", "", "visual_studio_code"},
+		{"Name lowercased", parseDesktopFile([]byte("[Desktop Entry]\nName=Krita\n")), "krita.desktop", "", "krita"},
+		{"desktop id fallback", nil, "org.kde.krita.desktop", "", "org.kde.krita"},
+		{"filename fallback", nil, "", "/dl/Krita-5.2.0-x86_64.AppImage", "krita5.2.0x86_64"},
 	}
-	if got := deriveAppName("", "/dl/Krita-5.2.0-x86_64.AppImage"); got != "Krita-5.2.0-x86_64" {
-		t.Fatalf("deriveAppName fallback = %q, want Krita-5.2.0-x86_64", got)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := deriveAppName(tc.desktop, tc.desktopName, tc.appimagePath); got != tc.want {
+				t.Fatalf("deriveAppName = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 

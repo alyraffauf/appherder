@@ -32,7 +32,7 @@ func (a app) install(appimage string) (err error) {
 	}
 
 	icon := resolveIcon(fsys)
-	appName := deriveAppName(desktopName, appimage)
+	appName := deriveAppName(desktop, desktopName, appimage)
 
 	// Patch in memory before any filesystem writes so a failure here installs nothing.
 	if desktop != nil {
@@ -78,13 +78,35 @@ func (a app) install(appimage string) (err error) {
 	return nil
 }
 
-// deriveAppName prefers the AppImage's desktop-file id, which is stable across
-// versions, and falls back to the source filename when no desktop entry ships.
-func deriveAppName(desktopName string, appimagePath string) string {
-	if name := strings.TrimSuffix(desktopName, ".desktop"); name != "" {
-		return name
+// deriveAppName picks the canonical install name, matching GearLever so the
+// two tools land at the same path: the desktop entry's Name field (e.g.
+// "ES-DE" -> "esde"), then the desktop-file id, then the source filename.
+func deriveAppName(desktop *desktopFile, desktopName string, appimagePath string) string {
+	if desktop != nil {
+		if name, ok := desktop.get("Name", desktopEntrySection); ok && name != "" {
+			return sanitizeAppName(name)
+		}
 	}
-	return appNameFromPath(appimagePath)
+	if name := strings.TrimSuffix(desktopName, ".desktop"); name != "" {
+		return sanitizeAppName(name)
+	}
+	return sanitizeAppName(appNameFromPath(appimagePath))
+}
+
+// sanitizeAppName lowercases s, turns spaces into underscores, and drops any
+// character that isn't alphanumeric, underscore, or dot — GearLever's naming
+// rule.
+func sanitizeAppName(s string) string {
+	s = strings.ToLower(s)
+	s = strings.ReplaceAll(s, " ", "_")
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' || r == '.' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 func appNameFromPath(path string) string {
