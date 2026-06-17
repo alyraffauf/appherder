@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -13,6 +14,9 @@ import (
 const (
 	desktopEntrySection       = "Desktop Entry"
 	desktopActionSectionStart = "Desktop Action "
+	// desktopOwnerKey marks a desktop entry as installed by appherder, so we
+	// only ever remove launchers we created.
+	desktopOwnerKey = "X-AppHerder"
 )
 
 type desktopKey struct {
@@ -118,6 +122,41 @@ func parseDesktopFile(data []byte) *desktopFile {
 	return desktop
 }
 
+// isManagedDesktop reports whether the desktop entry at path carries
+// appherder's ownership marker. A missing file is reported as unmanaged.
+func isManagedDesktop(path string) (bool, error) {
+	desktop, err := readDesktopFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, fmt.Errorf("read desktop file %s: %w", path, err)
+	}
+	value, ok := desktop.get(desktopOwnerKey, desktopEntrySection)
+	return ok && value == "true", nil
+}
+
+// managedApps returns the ids of desktop entries appherder installed, found by
+// scanning the user applications directory for the ownership marker.
+func managedApps(home string) ([]string, error) {
+	matches, err := filepath.Glob(filepath.Join(home, ".local", "share", "applications", "*.desktop"))
+	if err != nil {
+		return nil, err
+	}
+
+	var apps []string
+	for _, path := range matches {
+		managed, err := isManagedDesktop(path)
+		if err != nil {
+			return nil, err
+		}
+		if managed {
+			apps = append(apps, strings.TrimSuffix(filepath.Base(path), ".desktop"))
+		}
+	}
+	return apps, nil
+}
+
 func (d *desktopFile) section(name string) *desktopSection {
 	if section := d.findSection(name); section != nil {
 		return section
@@ -213,6 +252,7 @@ func (a app) patchDesktopFile(desktop *desktopFile, appName string, hasIcon bool
 	appimages := filepath.Join(home, "AppImages")
 	appimage := filepath.Join(appimages, appName+".appimage")
 
+	desktop.set(desktopOwnerKey, "true", desktopEntrySection)
 	if hasIcon {
 		desktop.set("Icon", filepath.Join(appimages, ".icons", appName), desktopEntrySection)
 	}

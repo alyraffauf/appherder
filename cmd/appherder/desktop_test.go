@@ -74,6 +74,7 @@ func TestPatchDesktopFilePreservesDesktopActions(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	assertDesktopValue(t, patched, desktopEntrySection, desktopOwnerKey, "true")
 	assertDesktopValue(t, patched, desktopEntrySection, "Icon", "/home/test/AppImages/.icons/example")
 	assertDesktopValue(t, patched, desktopEntrySection, "TryExec", "/home/test/AppImages/example.appimage")
 	assertDesktopExec(t, patched, desktopEntrySection, []string{"env", "FOO=bar", "DESKTOPINTEGRATION=1", "/home/test/AppImages/example.appimage", "%U"})

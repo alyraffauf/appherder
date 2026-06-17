@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func (a app) uninstall(name string) error {
+func (a app) uninstall(name string, force bool) error {
 	appName := normalizeAppName(name)
 	home, err := a.homeDir()
 	if err != nil {
@@ -16,6 +16,17 @@ func (a app) uninstall(name string) error {
 	}
 
 	for _, path := range installedPaths(home, appName) {
+		if strings.HasSuffix(path, ".desktop") && !force {
+			managed, err := isManagedDesktop(path)
+			if err != nil {
+				return err
+			}
+			// Leave launchers we didn't install (a name clash, or a pre-marker
+			// install); --force overrides this.
+			if !managed {
+				continue
+			}
+		}
 		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("remove %s: %w", path, err)
 		}

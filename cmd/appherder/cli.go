@@ -31,12 +31,16 @@ func newInstallCommand(a app) *cobra.Command {
 }
 
 func newUninstallCommand(a app) *cobra.Command {
-	return &cobra.Command{
+	var force bool
+	cmd := &cobra.Command{
 		Use:   "uninstall APP|APPIMAGE",
 		Short: "Uninstall an AppImage",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return a.uninstall(args[0])
+			return a.uninstall(args[0], force)
 		},
 	}
+	cmd.Flags().BoolVarP(&force, "force", "f", false,
+		"Remove the app even if appherder didn't install it")
+	return cmd
 }
