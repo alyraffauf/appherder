@@ -15,7 +15,7 @@ func newRootCommand(a app, stdout io.Writer, stderr io.Writer) *cobra.Command {
 	}
 	cmd.SetOut(stdout)
 	cmd.SetErr(stderr)
-	cmd.AddCommand(newInstallCommand(a), newUninstallCommand(a))
+	cmd.AddCommand(newInstallCommand(a), newUninstallCommand(a), newSyncCommand(a))
 	return cmd
 }
 
@@ -43,4 +43,15 @@ func newUninstallCommand(a app) *cobra.Command {
 	cmd.Flags().BoolVarP(&force, "force", "f", false,
 		"Remove the app even if appherder didn't install it")
 	return cmd
+}
+
+func newSyncCommand(a app) *cobra.Command {
+	return &cobra.Command{
+		Use:   "sync",
+		Short: "Reconcile ~/AppImages with installed applications",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return a.sync(cmd.OutOrStdout())
+		},
+	}
 }
