@@ -43,6 +43,15 @@ func TestPatchExecCommandDoesNotDuplicateDesktopIntegration(t *testing.T) {
 	assertTokens(t, got, want)
 }
 
+func TestPatchExecCommandKeepsPositionalKeyValueArgument(t *testing.T) {
+	got := mustSplit(t, patchExecCommand(
+		"upstream-app --set key=value %U",
+		"/home/test/AppImages/example.appimage",
+	))
+	want := []string{"env", "DESKTOPINTEGRATION=1", "/home/test/AppImages/example.appimage", "--set", "key=value", "%U"}
+	assertTokens(t, got, want)
+}
+
 func mustSplit(t *testing.T, cmd string) []string {
 	t.Helper()
 

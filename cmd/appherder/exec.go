@@ -28,7 +28,7 @@ func patchExecCommand(execCmd string, appimage string) string {
 
 	args := []string{}
 	for _, token := range tokens[executableIndex+1:] {
-		if isStrippedDesktopExecCode(token) || isEnvVar(token) {
+		if isStrippedDesktopExecCode(token) {
 			continue
 		}
 		args = append(args, token)
