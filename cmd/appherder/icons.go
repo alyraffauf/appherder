@@ -9,54 +9,66 @@ import (
 	"strings"
 )
 
-// resolveIcon prefers .DirIcon, then any icon at the AppImage root, then icons
-// in the standard theme directories. It returns the in-archive path, or "" when
-// none is found.
+// resolveIcon picks the AppImage's icon by location first: .DirIcon, then any
+// icon at the root, then the themed directories. Format (svg > png > xpm) and
+// size only break ties within a tier. It returns "" when none is found.
 func resolveIcon(fsys fs.FS) string {
 	if info, err := fs.Stat(fsys, ".DirIcon"); err == nil && !info.IsDir() {
 		return ".DirIcon"
 	}
-	return findFallbackIcon(fsys)
+	if icon := bestRootIcon(fsys); icon != "" {
+		return icon
+	}
+	return bestThemedIcon(fsys)
 }
 
-func findFallbackIcon(fsys fs.FS) string {
-	best := ""
-	bestRank := -1
-	var bestSize int64
-	consider := func(name string, entry fs.DirEntry) {
-		rank := iconRank(name)
-		if rank < 0 {
-			return
-		}
-		info, err := entry.Info()
-		if err != nil {
-			return
-		}
-		// Prefer the higher-ranked extension, then the larger (higher-res) file.
-		if size := info.Size(); rank > bestRank || (rank == bestRank && size > bestSize) {
-			best, bestRank, bestSize = name, rank, size
+func bestRootIcon(fsys fs.FS) string {
+	entries, err := fs.ReadDir(fsys, ".")
+	if err != nil {
+		return ""
+	}
+	var p iconPicker
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			p.consider(entry.Name(), entry)
 		}
 	}
+	return p.best
+}
 
-	if entries, err := fs.ReadDir(fsys, "."); err == nil {
-		for _, entry := range entries {
-			if !entry.IsDir() {
-				consider(entry.Name(), entry)
-			}
-		}
-	}
-
+func bestThemedIcon(fsys fs.FS) string {
+	var p iconPicker
 	for _, dir := range []string{"usr/share/icons", "usr/share/pixmaps"} {
 		_ = fs.WalkDir(fsys, dir, func(name string, entry fs.DirEntry, err error) error {
 			if err != nil || entry.IsDir() {
 				return nil
 			}
-			consider(name, entry)
+			p.consider(name, entry)
 			return nil
 		})
 	}
+	return p.best
+}
 
-	return best
+// iconPicker keeps the best icon seen, preferring format rank then larger size.
+type iconPicker struct {
+	best string
+	rank int
+	size int64
+}
+
+func (p *iconPicker) consider(name string, entry fs.DirEntry) {
+	rank := iconRank(name)
+	if rank < 0 {
+		return
+	}
+	info, err := entry.Info()
+	if err != nil {
+		return
+	}
+	if p.best == "" || rank > p.rank || (rank == p.rank && info.Size() > p.size) {
+		p.best, p.rank, p.size = name, rank, info.Size()
+	}
 }
 
 // iconRank ranks icon extensions (higher preferred); -1 means not an icon.
