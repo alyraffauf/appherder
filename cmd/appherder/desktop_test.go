@@ -61,7 +61,7 @@ func TestPatchDesktopFilePreservesDesktopActions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := a.patchDesktopFile(desktop, "example"); err != nil {
+	if err := a.patchDesktopFile(desktop, "example", true); err != nil {
 		t.Fatal(err)
 	}
 	if err := desktop.write(output); err != nil {

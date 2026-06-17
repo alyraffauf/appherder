@@ -32,23 +32,44 @@ func (a app) install(appimage string) error {
 	icon := resolveIcon(extracted)
 	appName := appNameFromPath(appimage)
 
-	if icon != "" {
-		if _, err := a.installIcon(icon, appName); err != nil {
+	// Patch in memory before any filesystem writes so a failure here installs nothing.
+	if desktop != nil {
+		if err := a.patchDesktopFile(desktop, appName, icon != ""); err != nil {
 			return err
 		}
 	}
 
-	if _, err := a.installAppImage(appimage, appName); err != nil {
+	// Roll back written files on a later failure rather than leaving a half-installed app.
+	var installed []string
+	rollback := func() {
+		for _, path := range installed {
+			_ = os.Remove(path)
+		}
+	}
+
+	if icon != "" {
+		dest, err := a.installIcon(icon, appName)
+		if err != nil {
+			rollback()
+			return err
+		}
+		installed = append(installed, dest)
+	}
+
+	dest, err := a.installAppImage(appimage, appName)
+	if err != nil {
+		rollback()
 		return err
 	}
+	installed = append(installed, dest)
 
 	if desktop != nil {
-		if err := a.patchDesktopFile(desktop, appName); err != nil {
+		dest, err := a.installDesktopFile(desktop, appName)
+		if err != nil {
+			rollback()
 			return err
 		}
-		if _, err := a.installDesktopFile(desktop, appName); err != nil {
-			return err
-		}
+		installed = append(installed, dest)
 	}
 
 	return nil

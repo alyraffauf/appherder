@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -190,10 +191,13 @@ func (d *desktopFile) write(path string) error {
 	if d.trailingNewline {
 		text += "\n"
 	}
-	return os.WriteFile(path, []byte(text), 0o644)
+	return writeAtomic(path, 0o644, func(w io.Writer) error {
+		_, err := w.Write([]byte(text))
+		return err
+	})
 }
 
-func (a app) patchDesktopFile(desktop *desktopFile, appName string) error {
+func (a app) patchDesktopFile(desktop *desktopFile, appName string, hasIcon bool) error {
 	home, err := a.homeDir()
 	if err != nil {
 		return fmt.Errorf("resolve home directory: %w", err)
@@ -202,7 +206,9 @@ func (a app) patchDesktopFile(desktop *desktopFile, appName string) error {
 	appimages := filepath.Join(home, "AppImages")
 	appimage := filepath.Join(appimages, appName+".appimage")
 
-	desktop.set("Icon", filepath.Join(appimages, ".icons", appName), desktopEntrySection)
+	if hasIcon {
+		desktop.set("Icon", filepath.Join(appimages, ".icons", appName), desktopEntrySection)
+	}
 	desktop.set("TryExec", appimage, desktopEntrySection)
 
 	if execCmd, ok := desktop.get("Exec", desktopEntrySection); ok {

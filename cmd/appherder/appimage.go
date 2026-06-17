@@ -33,29 +33,10 @@ func (a app) installAppImage(file string, appName string) (string, error) {
 	}
 
 	dest := filepath.Join(appimagesDir, appName+".appimage")
-	tmp, err := os.CreateTemp(appimagesDir, "."+appName+".*.tmp")
-	if err != nil {
-		return "", fmt.Errorf("create temporary AppImage in %s: %w", appimagesDir, err)
-	}
-	tmpName := tmp.Name()
-	defer os.Remove(tmpName)
-
-	if err := copyTo(file, tmp); err != nil {
-		_ = tmp.Close()
-		return "", fmt.Errorf("copy AppImage %s to %s: %w", file, tmpName, err)
-	}
-	if err := tmp.Close(); err != nil {
-		return "", fmt.Errorf("close temporary AppImage %s: %w", tmpName, err)
-	}
-
-	if err := os.Chmod(tmpName, 0o755); err != nil {
-		return "", fmt.Errorf("make temporary AppImage executable %s: %w", tmpName, err)
-	}
-	if err := os.Rename(tmpName, dest); err != nil {
-		return "", fmt.Errorf("replace AppImage %s: %w", dest, err)
-	}
-	if err := os.Chmod(dest, 0o755); err != nil {
-		return "", fmt.Errorf("make installed AppImage executable %s: %w", dest, err)
+	if err := writeAtomic(dest, 0o755, func(w io.Writer) error {
+		return copyTo(file, w)
+	}); err != nil {
+		return "", fmt.Errorf("install AppImage %s to %s: %w", file, dest, err)
 	}
 
 	return dest, nil
