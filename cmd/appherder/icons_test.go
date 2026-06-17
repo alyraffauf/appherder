@@ -18,7 +18,7 @@ func TestResolveIconPrefersDirIcon(t *testing.T) {
 
 func TestResolveIconPrefersRootOverThemedEvenIfSmaller(t *testing.T) {
 	fsys := fstest.MapFS{
-		"app.png":                 {Data: []byte("x")},                 // root, tiny png
+		"app.png":                 {Data: []byte("x")},                // root, tiny png
 		"usr/share/icons/big.svg": {Data: []byte("a larger payload")}, // themed, higher format and larger
 	}
 	if got := resolveIcon(fsys); got != "app.png" {
@@ -29,7 +29,7 @@ func TestResolveIconPrefersRootOverThemedEvenIfSmaller(t *testing.T) {
 func TestResolveIconPrefersSvgWithinTier(t *testing.T) {
 	fsys := fstest.MapFS{
 		"app.png": {Data: []byte("0123456789")}, // larger png
-		"app.svg": {Data: []byte("s")},           // smaller, but higher format
+		"app.svg": {Data: []byte("s")},          // smaller, but higher format
 	}
 	if got := resolveIcon(fsys); got != "app.svg" {
 		t.Fatalf("resolveIcon = %q, want app.svg", got)
