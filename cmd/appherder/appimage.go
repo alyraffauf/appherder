@@ -108,13 +108,56 @@ func (a app) installAppImage(file string, appName string) (string, error) {
 	}
 
 	dest := filepath.Join(appimagesDir, appName+".appimage")
-	if err := writeAtomic(dest, 0o755, func(w io.Writer) error {
-		return copyTo(file, w)
-	}); err != nil {
-		return "", fmt.Errorf("install AppImage %s to %s: %w", file, dest, err)
+	inFolder := samePath(filepath.Dir(file), appimagesDir)
+
+	if !samePath(file, dest) {
+		same, err := sameContent(file, dest)
+		if err != nil {
+			return "", fmt.Errorf("compare AppImage %s with %s: %w", file, dest, err)
+		}
+		switch {
+		case same:
+			// Installed binary is already byte-identical, so skip the copy. If
+			// the source is a duplicate dropped into ~/AppImages, remove it.
+			if inFolder {
+				if err := os.Remove(file); err != nil {
+					return "", fmt.Errorf("remove duplicate AppImage %s: %w", file, err)
+				}
+			}
+		case inFolder:
+			// A differently-named AppImage already in ~/AppImages: move it into
+			// place instead of leaving a duplicate.
+			if err := os.Rename(file, dest); err != nil {
+				return "", fmt.Errorf("move AppImage %s to %s: %w", file, dest, err)
+			}
+		default:
+			// Source lives elsewhere: copy it in.
+			if err := writeAtomic(dest, 0o755, func(w io.Writer) error {
+				return copyTo(file, w)
+			}); err != nil {
+				return "", fmt.Errorf("install AppImage %s to %s: %w", file, dest, err)
+			}
+		}
 	}
 
+	if err := os.Chmod(dest, 0o755); err != nil {
+		return "", fmt.Errorf("make AppImage executable %s: %w", dest, err)
+	}
 	return dest, nil
+}
+
+// samePath reports whether a and b resolve to the same file, accounting for
+// symlinks and mounts (e.g. /home -> /var/home).
+func samePath(a, b string) bool {
+	ai, err := os.Stat(a)
+	if err != nil {
+		return false
+	}
+	bi, err := os.Stat(b)
+	if err != nil {
+		return false
+	}
+	return os.SameFile(ai, bi)
 }
 
 func copyTo(src string, dest io.Writer) error {

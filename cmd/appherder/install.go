@@ -58,13 +58,6 @@ func (a app) install(appimage string) (err error) {
 		installed = append(installed, dest)
 	}
 
-	dest, err := a.installAppImage(appimage, appName)
-	if err != nil {
-		rollback()
-		return err
-	}
-	installed = append(installed, dest)
-
 	if desktop != nil {
 		dest, err := a.installDesktopFile(desktop, appName)
 		if err != nil {
@@ -72,6 +65,14 @@ func (a app) install(appimage string) (err error) {
 			return err
 		}
 		installed = append(installed, dest)
+	}
+
+	// Materialize the AppImage last: when the source is already in ~/AppImages
+	// it gets moved, so an earlier failure must not roll back over the user's
+	// file.
+	if _, err := a.installAppImage(appimage, appName); err != nil {
+		rollback()
+		return err
 	}
 
 	return nil

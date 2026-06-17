@@ -1,6 +1,9 @@
 package main
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"errors"
 	"io"
 	"io/fs"
 	"os"
@@ -32,6 +35,49 @@ func writeAtomic(path string, perm os.FileMode, write func(io.Writer) error) (er
 		return err
 	}
 	return os.Rename(tmpName, path)
+}
+
+// sameContent reports whether a and b are byte-identical, comparing size first
+// to avoid hashing files that obviously differ. A missing b reports false.
+func sameContent(a, b string) (bool, error) {
+	ia, err := os.Stat(a)
+	if err != nil {
+		return false, err
+	}
+	ib, err := os.Stat(b)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, err
+	}
+	if ia.Size() != ib.Size() {
+		return false, nil
+	}
+
+	ha, err := fileHash(a)
+	if err != nil {
+		return false, err
+	}
+	hb, err := fileHash(b)
+	if err != nil {
+		return false, err
+	}
+	return bytes.Equal(ha, hb), nil
+}
+
+func fileHash(path string) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return nil, err
+	}
+	return h.Sum(nil), nil
 }
 
 func copyFromFS(fsys fs.FS, name string, dest string) error {
