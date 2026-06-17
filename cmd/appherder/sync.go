@@ -10,9 +10,11 @@ import (
 )
 
 // sync reconciles ~/AppImages with installed state: install every AppImage in
-// the folder, remove managed launchers whose AppImage is gone. Per-file errors
-// are reported and skipped so one bad file does not abort the pass.
-func (a app) sync(out io.Writer) error {
+// the folder, remove launchers whose AppImage is gone. With force, also remove
+// unmanaged launchers whose TryExec/Exec points at a missing file in ~/AppImages
+// (entries left by another tool). Per-file errors are reported and skipped so
+// one bad file does not abort the pass.
+func (a app) sync(out io.Writer, force bool) error {
 	home, err := a.homeDir()
 	if err != nil {
 		return fmt.Errorf("resolve home directory: %w", err)
@@ -31,12 +33,18 @@ func (a app) sync(out io.Writer) error {
 		}
 	}
 
-	managed, err := managedApps(home)
+	candidates, err := managedApps(home)
 	if err != nil {
 		return err
 	}
-	for _, appid := range managed {
-		// Look for the managed app's AppImage under any extension casing.
+	if force {
+		extra, err := appImageBackedOrphans(home, appimagesDir)
+		if err != nil {
+			return err
+		}
+		candidates = append(candidates, extra...)
+	}
+	for _, appid := range candidates {
 		present, err := appImagePresent(appimagesDir, appid)
 		if err != nil {
 			return err
@@ -44,7 +52,7 @@ func (a app) sync(out io.Writer) error {
 		if present {
 			continue
 		}
-		if err := a.uninstall(appid, false); err != nil {
+		if err := a.uninstall(appid, force); err != nil {
 			fmt.Fprintf(out, "skip remove %s: %v\n", appid, err)
 			continue
 		}
@@ -78,8 +86,7 @@ func listAppImages(dir string) ([]string, error) {
 }
 
 // appImagePresent reports whether <appid>.appimage exists in dir, matching the
-// extension case-insensitively. Install normalizes the name to <appid>.appimage
-// on success; on install failure the original casing may remain.
+// extension case-insensitively.
 func appImagePresent(dir, appid string) (bool, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -97,4 +104,49 @@ func appImagePresent(dir, appid string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+// appImageBackedOrphans returns appids of unmanaged desktop entries whose
+// TryExec or Exec points at a missing file inside appimagesDir — launchers left
+// by another tool after their AppImage was deleted.
+func appImageBackedOrphans(home, appimagesDir string) ([]string, error) {
+	appsDir := filepath.Join(home, ".local", "share", "applications")
+	matches, err := filepath.Glob(filepath.Join(appsDir, "*.desktop"))
+	if err != nil {
+		return nil, err
+	}
+	prefix := appimagesDir + string(filepath.Separator)
+	var orphans []string
+	for _, path := range matches {
+		desktop, err := readDesktopFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("read desktop file %s: %w", path, err)
+		}
+		if v, ok := desktop.get(desktopOwnerKey, desktopEntrySection); ok && v == "true" {
+			continue
+		}
+		target := desktopTarget(desktop)
+		if target == "" || !strings.HasPrefix(target, prefix) {
+			continue
+		}
+		if _, err := os.Stat(target); err == nil {
+			continue
+		} else if !os.IsNotExist(err) {
+			return nil, err
+		}
+		orphans = append(orphans, strings.TrimSuffix(filepath.Base(path), ".desktop"))
+	}
+	return orphans, nil
+}
+
+// desktopTarget returns the executable path a launcher points at, preferring
+// TryExec.
+func desktopTarget(desktop *desktopFile) string {
+	if tryExec, ok := desktop.get("TryExec", desktopEntrySection); ok && tryExec != "" {
+		return tryExec
+	}
+	if exec, ok := desktop.get("Exec", desktopEntrySection); ok {
+		return execPath(exec)
+	}
+	return ""
 }

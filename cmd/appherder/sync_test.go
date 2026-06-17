@@ -29,7 +29,7 @@ func TestSyncRemovesOrphanedManagedLauncher(t *testing.T) {
 
 	var out bytes.Buffer
 	a := app{homeDir: func() (string, error) { return home, nil }}
-	if err := a.sync(&out); err != nil {
+	if err := a.sync(&out, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -56,7 +56,7 @@ func TestSyncKeepsManagedLauncherWhenAppImagePresent(t *testing.T) {
 
 	var out bytes.Buffer
 	a := app{homeDir: func() (string, error) { return home, nil }}
-	if err := a.sync(&out); err != nil {
+	if err := a.sync(&out, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -77,18 +77,81 @@ func TestSyncKeepsUnmanagedLauncherEvenWhenAppImageAbsent(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "handmade.desktop"), []byte("[Desktop Entry]\nName=Mine\n"), 0o644); err != nil {
+	// No TryExec under ~/AppImages: --force must leave it alone.
+	handmade := filepath.Join(dir, "handmade.desktop")
+	if err := os.WriteFile(handmade, []byte("[Desktop Entry]\nName=Mine\nTryExec=/usr/bin/foo\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	a := app{homeDir: func() (string, error) { return home, nil }}
+	for _, force := range []bool{false, true} {
+		var out bytes.Buffer
+		if err := a.sync(&out, force); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(handmade); err != nil {
+			t.Fatalf("force=%v: unmanaged launcher must not be touched, stat err: %v", force, err)
+		}
+	}
+}
+
+func TestSyncForceRemovesAppImageBackedOrphan(t *testing.T) {
+	home := t.TempDir()
+	appimages := filepath.Join(home, "AppImages")
+	if err := os.MkdirAll(appimages, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(home, ".local", "share", "applications")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Unmanaged launcher pointing at a missing AppImage: --force removes it.
+	target := filepath.Join(appimages, "gone.appimage")
+	if err := os.WriteFile(filepath.Join(dir, "gone.desktop"),
+		[]byte("[Desktop Entry]\nName=Gone\nTryExec="+target+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	var out bytes.Buffer
 	a := app{homeDir: func() (string, error) { return home, nil }}
-	if err := a.sync(&out); err != nil {
+	if err := a.sync(&out, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "gone.desktop")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("--force should remove the AppImage-backed orphan, stat err: %v", err)
+	}
+	if !bytes.Contains(out.Bytes(), []byte("removed gone")) {
+		t.Fatalf("sync output = %q, want removal reported", out.String())
+	}
+}
+
+func TestSyncForceKeepsOrphanWhenAppImageStillPresent(t *testing.T) {
+	home := t.TempDir()
+	appimages := filepath.Join(home, "AppImages")
+	if err := os.MkdirAll(appimages, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(home, ".local", "share", "applications")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Present (if unparseable) AppImage: --force keeps it; install adopts it.
+	target := filepath.Join(appimages, "present.appimage")
+	if err := os.WriteFile(target, []byte("not an appimage"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "present.desktop"),
+		[]byte("[Desktop Entry]\nName=Present\nTryExec="+target+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := os.Stat(filepath.Join(dir, "handmade.desktop")); err != nil {
-		t.Fatalf("unmanaged launcher must not be touched by sync: %v", err)
+	var out bytes.Buffer
+	a := app{homeDir: func() (string, error) { return home, nil }}
+	if err := a.sync(&out, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "present.desktop")); err != nil {
+		t.Fatalf("--force must keep a launcher whose AppImage is still present: %v", err)
 	}
 }
 
@@ -107,7 +170,7 @@ func TestSyncIgnoresHiddenAndTempFiles(t *testing.T) {
 
 	var out bytes.Buffer
 	a := app{homeDir: func() (string, error) { return home, nil }}
-	if err := a.sync(&out); err != nil {
+	if err := a.sync(&out, false); err != nil {
 		t.Fatal(err)
 	}
 	if out.Len() != 0 {
@@ -121,7 +184,7 @@ func TestSyncHandlesMissingAppImagesDir(t *testing.T) {
 
 	var out bytes.Buffer
 	a := app{homeDir: func() (string, error) { return home, nil }}
-	if err := a.sync(&out); err != nil {
+	if err := a.sync(&out, false); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(home, ".local", "share", "applications", "orphan.desktop")); !errors.Is(err, os.ErrNotExist) {

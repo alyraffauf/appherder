@@ -57,6 +57,26 @@ func isEnvVar(token string) bool {
 	return strings.Contains(token, "=") && !strings.HasPrefix(token, "/") && !strings.HasPrefix(token, "-")
 }
 
+// execPath returns the executable path from a desktop Exec/TryExec command,
+// skipping a leading env and KEY=VALUE assignments.
+func execPath(cmd string) string {
+	tokens, err := shellquote.Split(cmd)
+	if err != nil {
+		return ""
+	}
+	i := 0
+	if i < len(tokens) && tokens[i] == "env" {
+		i++
+	}
+	for i < len(tokens) && isEnvVar(tokens[i]) {
+		i++
+	}
+	if i < len(tokens) {
+		return tokens[i]
+	}
+	return ""
+}
+
 func isStrippedDesktopExecCode(token string) bool {
 	return token == "%i" || token == "%c" || token == "%k"
 }

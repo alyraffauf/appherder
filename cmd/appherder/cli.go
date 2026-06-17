@@ -15,7 +15,7 @@ func newRootCommand(a app, stdout io.Writer, stderr io.Writer) *cobra.Command {
 	}
 	cmd.SetOut(stdout)
 	cmd.SetErr(stderr)
-	cmd.AddCommand(newInstallCommand(a), newUninstallCommand(a), newSyncCommand(a))
+	cmd.AddCommand(newInstallCommand(a), newUninstallCommand(a), newSyncCommand(a), newMigrateCommand(a))
 	return cmd
 }
 
@@ -46,12 +46,27 @@ func newUninstallCommand(a app) *cobra.Command {
 }
 
 func newSyncCommand(a app) *cobra.Command {
-	return &cobra.Command{
+	var force bool
+	cmd := &cobra.Command{
 		Use:   "sync",
 		Short: "Reconcile ~/AppImages with installed applications",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return a.sync(cmd.OutOrStdout())
+			return a.sync(cmd.OutOrStdout(), force)
+		},
+	}
+	cmd.Flags().BoolVarP(&force, "force", "f", false,
+		"Also remove launchers appherder didn't install, when their AppImage is gone")
+	return cmd
+}
+
+func newMigrateCommand(a app) *cobra.Command {
+	return &cobra.Command{
+		Use:   "migrate",
+		Short: "Adopt launchers from another tool and remove their broken orphans",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return a.sync(cmd.OutOrStdout(), true)
 		},
 	}
 }
