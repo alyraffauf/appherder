@@ -1,37 +1,31 @@
 package main
 
 import (
-	"errors"
-	"flag"
-	"fmt"
 	"io"
+
+	"github.com/spf13/cobra"
 )
 
-type config struct {
-	install string
+func newRootCommand(a app, stdout io.Writer, stderr io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:           "appherder",
+		Short:         "Manage AppImages with desktop integration",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+	}
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+	cmd.AddCommand(newInstallCommand(a))
+	return cmd
 }
 
-func parseArgs(args []string, output io.Writer) (config, error) {
-	fs := flag.NewFlagSet("appherder", flag.ContinueOnError)
-	fs.SetOutput(output)
-	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "Usage: appherder -install APPIMAGE")
-		fmt.Fprintln(fs.Output())
-		fmt.Fprintln(fs.Output(), "Manage AppImages with desktop integration.")
-		fmt.Fprintln(fs.Output())
-		fmt.Fprintln(fs.Output(), "Options:")
-		fs.PrintDefaults()
+func newInstallCommand(a app) *cobra.Command {
+	return &cobra.Command{
+		Use:   "install APPIMAGE",
+		Short: "Install an AppImage",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return a.install(args[0])
+		},
 	}
-
-	var cfg config
-	fs.StringVar(&cfg.install, "install", "", "Install an AppImage")
-	fs.StringVar(&cfg.install, "i", "", "Install an AppImage")
-
-	if err := fs.Parse(args); err != nil {
-		return cfg, err
-	}
-	if cfg.install == "" {
-		return cfg, errors.New("missing required -install APPIMAGE")
-	}
-	return cfg, nil
 }
