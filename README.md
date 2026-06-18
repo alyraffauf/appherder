@@ -133,7 +133,7 @@ Some AppImages are signed by their publisher. The first time AppHerder installs 
 
 ## Under the hood
 
-AppHerder reads the AppImage's filesystem directly to grab its icon and desktop entry, then writes a launcher pointing back at the file in `~/AppImages`. It does this without ever running the AppImage, unlike tools that launch it to unpack. Everything it writes is tagged, so uninstall and sync only touch its own files.
+AppHerder reads the AppImage's filesystem to grab its icon and desktop entry. SquashFS images are parsed in-process. DwarFS images use the system dwarfsextract tool, falling back to the AppImage's own runtime when the tool isn't available. Everything it writes is tagged, so uninstall and sync only touch its own files.
 
 ## License
 
