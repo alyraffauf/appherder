@@ -1,6 +1,38 @@
 package main
 
-import "testing"
+import (
+	"crypto/sha1"
+	"encoding/hex"
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestReleaseLocalMatchesSHA1(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "app.AppImage")
+	content := []byte("hello zsync")
+	if err := os.WriteFile(file, content, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha1.Sum(content)
+
+	rel := release{sha1: hex.EncodeToString(sum[:])}
+	if ok, err := rel.localMatches(file); err != nil || !ok {
+		t.Fatalf("localMatches = %v, %v; want true", ok, err)
+	}
+	if err := rel.verifyDownload(file); err != nil {
+		t.Fatalf("verifyDownload = %v; want nil", err)
+	}
+
+	stale := release{sha1: hex.EncodeToString(make([]byte, 20))}
+	if ok, _ := stale.localMatches(file); ok {
+		t.Fatal("localMatches = true for mismatched sha1")
+	}
+	if err := stale.verifyDownload(file); err == nil {
+		t.Fatal("verifyDownload = nil for mismatched sha1")
+	}
+}
 
 func TestParseUpdateInfoGitHubStripsZsyncSuffix(t *testing.T) {
 	src, err := parseUpdateInfo("gh-releases-zsync|myorg|myapp|latest|MyApp-*-x86_64.AppImage.zsync")

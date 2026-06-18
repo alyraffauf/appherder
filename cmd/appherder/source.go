@@ -2,8 +2,13 @@ package main
 
 import (
 	"context"
+	"crypto/sha1"
+	"crypto/sha256"
 	"debug/elf"
+	"encoding/hex"
 	"fmt"
+	"hash"
+	"os"
 	"strings"
 )
 
@@ -11,8 +16,59 @@ import (
 type release struct {
 	version string // human label, e.g. a release tag
 	url     string // download URL for the AppImage
-	sha256  string // hex sha256 of the asset, "" when the source can't provide it
+	sha256  string // hex sha256 of the asset, "" when unavailable
+	sha1    string // hex sha1 (zsync's hash), "" when unavailable
 	size    int64
+}
+
+// checksum returns the strongest hash the release carries with a hasher to
+// match; ok is false when the source provided no cryptographic hash.
+func (r release) checksum() (want string, h hash.Hash, ok bool) {
+	switch {
+	case r.sha256 != "":
+		return r.sha256, sha256.New(), true
+	case r.sha1 != "":
+		return r.sha1, sha1.New(), true
+	}
+	return "", nil, false
+}
+
+// localMatches reports whether file already equals this release, by the
+// strongest checksum available and falling back to size (a weak signal that
+// only distinguishes differently-sized builds).
+func (r release) localMatches(file string) (bool, error) {
+	if want, h, ok := r.checksum(); ok {
+		sum, err := fileSum(file, h)
+		if err != nil {
+			return false, err
+		}
+		return strings.EqualFold(hex.EncodeToString(sum), want), nil
+	}
+	if r.size > 0 {
+		info, err := os.Stat(file)
+		if err != nil {
+			return false, err
+		}
+		return info.Size() == r.size, nil
+	}
+	return false, nil
+}
+
+// verifyDownload checks a freshly downloaded file against the release's
+// checksum. With no checksum there is nothing to verify and it returns nil.
+func (r release) verifyDownload(file string) error {
+	want, h, ok := r.checksum()
+	if !ok {
+		return nil
+	}
+	sum, err := fileSum(file, h)
+	if err != nil {
+		return err
+	}
+	if !strings.EqualFold(hex.EncodeToString(sum), want) {
+		return fmt.Errorf("downloaded AppImage failed checksum verification")
+	}
+	return nil
 }
 
 // source resolves the latest available build of an installed app.
@@ -69,6 +125,12 @@ func parseUpdateInfo(info string) (source, error) {
 			tag:     fields[3],
 			pattern: strings.TrimSuffix(fields[4], ".zsync"),
 		}, nil
+	case "zsync":
+		// zsync|https://host/path/App-latest.AppImage.zsync
+		if len(fields) != 2 || fields[1] == "" {
+			return nil, fmt.Errorf("malformed zsync update info %q", info)
+		}
+		return zsyncURLSource{url: fields[1]}, nil
 	default:
 		return nil, fmt.Errorf("unsupported update source %q", fields[0])
 	}

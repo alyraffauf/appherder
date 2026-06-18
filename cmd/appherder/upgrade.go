@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -90,7 +89,7 @@ func checkOne(ctx context.Context, file string) upgradeCheck {
 		return upgradeCheck{name: name, err: err}
 	}
 
-	current, err := upToDate(file, rel)
+	current, err := rel.localMatches(file)
 	if err != nil {
 		return upgradeCheck{name: name, err: err}
 	}
@@ -119,26 +118,6 @@ func parallelMap[T, R any](ctx context.Context, items []T, limit int, fn func(co
 	return results
 }
 
-// upToDate reports whether the installed file already matches the latest
-// release, preferring an exact sha256 check and falling back to size.
-func upToDate(file string, rel release) (bool, error) {
-	if rel.sha256 != "" {
-		sum, err := fileHash(file)
-		if err != nil {
-			return false, err
-		}
-		return strings.EqualFold(hex.EncodeToString(sum), rel.sha256), nil
-	}
-	if rel.size > 0 {
-		info, err := os.Stat(file)
-		if err != nil {
-			return false, err
-		}
-		return info.Size() == rel.size, nil
-	}
-	return false, nil
-}
-
 func (a app) applyUpgrade(ctx context.Context, rel release) error {
 	tmp, err := os.CreateTemp("", "appherder-upgrade-*.appimage")
 	if err != nil {
@@ -155,14 +134,8 @@ func (a app) applyUpgrade(ctx context.Context, rel release) error {
 		return fmt.Errorf("close download: %w", err)
 	}
 
-	if rel.sha256 != "" {
-		sum, err := fileHash(tmpName)
-		if err != nil {
-			return err
-		}
-		if !strings.EqualFold(hex.EncodeToString(sum), rel.sha256) {
-			return fmt.Errorf("downloaded AppImage failed sha256 verification")
-		}
+	if err := rel.verifyDownload(tmpName); err != nil {
+		return err
 	}
 
 	return a.install(tmpName)

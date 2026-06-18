@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"errors"
+	"hash"
 	"io"
 	"io/fs"
 	"os"
@@ -83,13 +84,17 @@ func sameContent(a, b string) (bool, error) {
 }
 
 func fileHash(path string) ([]byte, error) {
+	return fileSum(path, sha256.New())
+}
+
+// fileSum returns h's checksum over the file's contents.
+func fileSum(path string, h hash.Hash) ([]byte, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 
-	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return nil, err
 	}
