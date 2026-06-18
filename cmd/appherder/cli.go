@@ -66,7 +66,7 @@ func newSyncCommand(a app) *cobra.Command {
 		Short: "Reconcile ~/AppImages with installed applications",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return a.sync(cmd.OutOrStdout(), force)
+			return a.sync(cmd.Context(), cmd.OutOrStdout(), force)
 		},
 	}
 	cmd.Flags().BoolVarP(&force, "force", "f", false,
@@ -80,7 +80,7 @@ func newMigrateCommand(a app) *cobra.Command {
 		Short: "Adopt launchers from another tool and remove their broken orphans",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return a.sync(cmd.OutOrStdout(), true)
+			return a.sync(cmd.Context(), cmd.OutOrStdout(), true)
 		},
 	}
 }

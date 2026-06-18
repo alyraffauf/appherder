@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -9,12 +10,21 @@ import (
 	"strings"
 )
 
+// installConcurrency caps parallel installs: enough to overlap metadata I/O
+// and squashfs decompression without copying several 200 MB binaries at once.
+const installConcurrency = 4
+
+type syncResult struct {
+	file string
+	err  error
+}
+
 // sync reconciles ~/AppImages with installed state: install every AppImage in
 // the folder, remove launchers whose AppImage is gone. With force, also remove
 // unmanaged launchers whose TryExec/Exec points at a missing file in ~/AppImages
 // (entries left by another tool). Per-file errors are reported and skipped so
 // one bad file does not abort the pass.
-func (a app) sync(out io.Writer, force bool) error {
+func (a app) sync(ctx context.Context, out io.Writer, force bool) error {
 	home, err := a.homeDir()
 	if err != nil {
 		return fmt.Errorf("resolve home directory: %w", err)
@@ -26,10 +36,13 @@ func (a app) sync(out io.Writer, force bool) error {
 		return err
 	}
 
-	for _, f := range files {
-		if err := a.install(f); err != nil {
-			fmt.Fprintf(out, "skip %s: %v\n", filepath.Base(f), err)
-			continue
+	// parallelMap preserves input order, so skip output stays deterministic.
+	results := parallelMap(ctx, files, installConcurrency, func(_ context.Context, f string) syncResult {
+		return syncResult{file: f, err: a.install(f)}
+	})
+	for _, r := range results {
+		if r.err != nil {
+			fmt.Fprintf(out, "skip %s: %v\n", filepath.Base(r.file), r.err)
 		}
 	}
 

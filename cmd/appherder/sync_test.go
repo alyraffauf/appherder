@@ -2,9 +2,11 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -29,7 +31,7 @@ func TestSyncRemovesOrphanedManagedLauncher(t *testing.T) {
 
 	var out bytes.Buffer
 	a := app{homeDir: func() (string, error) { return home, nil }}
-	if err := a.sync(&out, false); err != nil {
+	if err := a.sync(context.Background(), &out, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -56,7 +58,7 @@ func TestSyncKeepsManagedLauncherWhenAppImagePresent(t *testing.T) {
 
 	var out bytes.Buffer
 	a := app{homeDir: func() (string, error) { return home, nil }}
-	if err := a.sync(&out, false); err != nil {
+	if err := a.sync(context.Background(), &out, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -86,7 +88,7 @@ func TestSyncKeepsUnmanagedLauncherEvenWhenAppImageAbsent(t *testing.T) {
 	a := app{homeDir: func() (string, error) { return home, nil }}
 	for _, force := range []bool{false, true} {
 		var out bytes.Buffer
-		if err := a.sync(&out, force); err != nil {
+		if err := a.sync(context.Background(), &out, force); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := os.Stat(handmade); err != nil {
@@ -114,7 +116,7 @@ func TestSyncForceRemovesAppImageBackedOrphan(t *testing.T) {
 
 	var out bytes.Buffer
 	a := app{homeDir: func() (string, error) { return home, nil }}
-	if err := a.sync(&out, true); err != nil {
+	if err := a.sync(context.Background(), &out, true); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "gone.desktop")); !errors.Is(err, os.ErrNotExist) {
@@ -147,7 +149,7 @@ func TestSyncForceKeepsOrphanWhenAppImageStillPresent(t *testing.T) {
 
 	var out bytes.Buffer
 	a := app{homeDir: func() (string, error) { return home, nil }}
-	if err := a.sync(&out, true); err != nil {
+	if err := a.sync(context.Background(), &out, true); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "present.desktop")); err != nil {
@@ -170,7 +172,7 @@ func TestSyncIgnoresHiddenAndTempFiles(t *testing.T) {
 
 	var out bytes.Buffer
 	a := app{homeDir: func() (string, error) { return home, nil }}
-	if err := a.sync(&out, false); err != nil {
+	if err := a.sync(context.Background(), &out, false); err != nil {
 		t.Fatal(err)
 	}
 	if out.Len() != 0 {
@@ -184,10 +186,41 @@ func TestSyncHandlesMissingAppImagesDir(t *testing.T) {
 
 	var out bytes.Buffer
 	a := app{homeDir: func() (string, error) { return home, nil }}
-	if err := a.sync(&out, false); err != nil {
+	if err := a.sync(context.Background(), &out, false); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(home, ".local", "share", "applications", "orphan.desktop")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("missing ~/AppImages should still reconcile orphans away, stat err: %v", err)
+	}
+}
+
+func TestSyncReportsSkipsInInputOrder(t *testing.T) {
+	home := t.TempDir()
+	appimages := filepath.Join(home, "AppImages")
+	if err := os.MkdirAll(appimages, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Concurrent installs must still produce skip lines in input order.
+	for _, name := range []string{"charlie.appimage", "alpha.appimage", "bravo.appimage"} {
+		if err := os.WriteFile(filepath.Join(appimages, name), []byte("not an appimage"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var out bytes.Buffer
+	a := app{homeDir: func() (string, error) { return home, nil }}
+	if err := a.sync(context.Background(), &out, false); err != nil {
+		t.Fatal(err)
+	}
+
+	got := out.String()
+	want := []string{"alpha.appimage", "bravo.appimage", "charlie.appimage"}
+	pos := 0
+	for _, w := range want {
+		i := strings.Index(got[pos:], w)
+		if i < 0 {
+			t.Fatalf("output missing %s in order:\n%s", w, got)
+		}
+		pos += i + len(w)
 	}
 }
