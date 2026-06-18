@@ -7,6 +7,8 @@ import (
 	"github.com/alyraffauf/appherder/internal/appherder"
 )
 
+var version = "dev"
+
 func main() {
 	cmd := newRootCommand(appherder.NewApp(), os.Stdout, os.Stderr)
 	cmd.SetArgs(os.Args[1:])

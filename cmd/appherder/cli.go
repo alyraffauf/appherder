@@ -12,10 +12,12 @@ import (
 func newRootCommand(a appherder.App, stdout io.Writer, stderr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "appherder",
-		Short: "A herder for your AppImages",
-		Long: "appherder installs AppImages so they show up in your application menu with their\n" +
-			"real name and icon, instead of sitting in a folder doing nothing. Drop AppImages in\n" +
-			"~/AppImages and appherder keeps everything in sync.",
+		Short: "A shepherd for your AppImages",
+		Long: "appherder manages your AppImages for you. Drop them in ~/AppImages and they show\n" +
+			"up in your menu like any other app, with their real name and icon. New versions\n" +
+			"replace the old ones. Add or remove AppImages and appherder sorts it out,\n" +
+			"optionally on its own.",
+		Version:       version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
