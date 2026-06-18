@@ -11,6 +11,7 @@ On its own, an AppImage is just an executable in a folder. No icon, no menu entr
 ## Features
 
 - **Shows up like a real app.** Lands in your application menu with its real name and icon.
+- **Installs from a file or a URL.** Point it at a local AppImage or paste a download link — appherder fetches and installs it.
 - **Uninstalls cleanly.** Remove an app and its launcher and icon go with it. No leftovers.
 - **Upgrades replace instead of piling up.** appherder names an app by what's inside it, not the download's filename, so a newer version of `Foo` just replaces the old one.
 - **Checks for updates.** Reads the update info baked into each AppImage and fetches the latest from GitHub, GitLab, zsync, or a static URL. `appherder upgrade --check` shows what's new; `appherder upgrade` downloads and installs it.
@@ -50,7 +51,8 @@ go build ./cmd/appherder
 ## Usage
 
 ```bash
-appherder install ~/Downloads/Foo-x86_64.AppImage    # install one
+appherder install ~/Downloads/Foo-x86_64.AppImage    # install from a file
+appherder install https://example.com/Foo.AppImage    # or download and install
 appherder uninstall foo                              # remove one
 appherder list                                       # see what's installed
 appherder sync                                       # match your apps to what's in ~/AppImages

@@ -1,6 +1,7 @@
 package appherder
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -76,6 +77,26 @@ func (a App) Install(appimage string) (appName string, err error) {
 	}
 
 	return appName, nil
+}
+
+// InstallFromURL downloads an AppImage from url and installs it.
+func (a App) InstallFromURL(ctx context.Context, url string) (string, error) {
+	tmp, err := os.CreateTemp("", "appherder-install-*.appimage")
+	if err != nil {
+		return "", fmt.Errorf("create temporary file: %w", err)
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+
+	if err := download(ctx, url, tmp); err != nil {
+		tmp.Close()
+		return "", err
+	}
+	if err := tmp.Close(); err != nil {
+		return "", fmt.Errorf("close download: %w", err)
+	}
+
+	return a.Install(tmpName)
 }
 
 // deriveAppName picks the canonical install name, matching GearLever so the

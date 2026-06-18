@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"net/url"
 
 	"github.com/alyraffauf/appherder/internal/appherder"
 	"github.com/spf13/cobra"
@@ -33,12 +34,22 @@ func newRootCommand(a appherder.App, stdout io.Writer, stderr io.Writer) *cobra.
 
 func newInstallCommand(a appherder.App) *cobra.Command {
 	return &cobra.Command{
-		Use:   "install APPIMAGE",
-		Short: "Install an AppImage",
-		Long:  "Copies an AppImage into ~/AppImages and creates a launcher for it with the app's\nreal name and icon. You can delete the original download afterward.",
-		Args:  cobra.ExactArgs(1),
+		Use:   "install APPIMAGE|URL",
+		Short: "Install an AppImage from a file or URL",
+		Long: "Copies an AppImage into ~/AppImages and creates a launcher for it with the app's\n" +
+			"real name and icon. You can delete the original download afterward.\n\n" +
+			"Accepts a local file path or an HTTP/HTTPS URL to download directly.",
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			name, err := a.Install(args[0])
+			arg := args[0]
+			var name string
+			var err error
+			if isURL(arg) {
+				fmt.Fprintf(cmd.OutOrStdout(), "downloading %s...\n", arg)
+				name, err = a.InstallFromURL(cmd.Context(), arg)
+			} else {
+				name, err = a.Install(arg)
+			}
 			if err != nil {
 				return err
 			}
@@ -46,6 +57,11 @@ func newInstallCommand(a appherder.App) *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func isURL(s string) bool {
+	parsed, err := url.Parse(s)
+	return err == nil && (parsed.Scheme == "http" || parsed.Scheme == "https") && parsed.Host != ""
 }
 
 func newUninstallCommand(a appherder.App) *cobra.Command {
