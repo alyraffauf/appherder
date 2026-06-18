@@ -126,7 +126,9 @@ func fileSystemOffset(file io.ReaderAt) (int64, error) {
 }
 
 // isSquashFS reports whether a SquashFS superblock begins at offset.
-func isSquashFS(file interface{ ReadAt([]byte, int64) (int, error) }, offset int64) bool {
+func isSquashFS(file interface {
+	ReadAt([]byte, int64) (int, error)
+}, offset int64) bool {
 	magic := make([]byte, 4)
 	_, err := file.ReadAt(magic, offset)
 	return err == nil && string(magic) == "hsqs"
@@ -134,7 +136,9 @@ func isSquashFS(file interface{ ReadAt([]byte, int64) (int, error) }, offset int
 
 // scanForSquashFS searches for a SquashFS superblock in 4096-byte steps over
 // the next 64 MiB starting from offset. Returns the found position or false.
-func scanForSquashFS(file interface{ ReadAt([]byte, int64) (int, error) }, offset int64) (int64, bool) {
+func scanForSquashFS(file interface {
+	ReadAt([]byte, int64) (int, error)
+}, offset int64) (int64, bool) {
 	const window = 64 * 1024 * 1024
 	buf := make([]byte, 4096)
 	for pos := offset; pos < offset+window; pos += 4096 {
