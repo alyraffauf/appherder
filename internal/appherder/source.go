@@ -97,15 +97,11 @@ func ReadUpdateInfo(path string) (string, error) {
 	}
 	defer file.Close()
 
-	section := file.Section(".upd_info")
-	if section == nil {
-		return "", nil
-	}
-	data, err := section.Data()
+	data, _, _, err := sectionData(file, ".upd_info")
 	if err != nil {
-		return "", fmt.Errorf("read .upd_info from %s: %w", path, err)
+		return "", err
 	}
-	return strings.TrimRight(string(data), "\x00"), nil
+	return string(data), nil
 }
 
 // SourceForAppImage resolves an update source from the AppImage's embedded

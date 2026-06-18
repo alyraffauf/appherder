@@ -37,6 +37,13 @@ func (a App) Install(appimage string) (appName string, err error) {
 	icon := resolveIcon(fsys)
 	appName = deriveAppName(desktop, desktopName, appimage)
 
+	// Enforce the signature trust policy before any filesystem writes, so a
+	// refused AppImage installs nothing.
+	pin, err := checkSignature(appimage, a.pinnedSigningKey(appName))
+	if err != nil {
+		return "", err
+	}
+
 	// No desktop file inside the AppImage: synthesize a terminal launcher so
 	// CLI apps still get a menu entry and are tracked by managedApps.
 	if desktop == nil {
@@ -49,6 +56,9 @@ func (a App) Install(appimage string) (appName string, err error) {
 	// Patch in memory before any filesystem writes so a failure here installs nothing.
 	if err := a.patchDesktopFile(desktop, appName, icon != ""); err != nil {
 		return "", err
+	}
+	if pin != "" {
+		desktop.Set(desktopEntrySection, desktopSigningKey, pin)
 	}
 
 	// Roll back written files on a later failure rather than leaving a half-installed app.
