@@ -33,6 +33,11 @@
           packages = with pkgs; [
             go
             dwarfs
+            pkg-config
+            glib
+            gobject-introspection
+            gtk4
+            libadwaita
             self.formatter.${system}
           ];
         };
