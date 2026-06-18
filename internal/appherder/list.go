@@ -12,6 +12,7 @@ import (
 type AppInfo struct {
 	AppID     string
 	Name      string // desktop Name= field, falls back to filename
+	Icon      string // desktop Icon= field, usually appherder's installed icon path
 	Filename  string // basename of the AppImage in ~/AppImages, "" when missing
 	Version   string // desktop X-AppImage-Version=
 	Size      int64
@@ -44,6 +45,9 @@ func gatherAppInfo(appsDir, appimagesDir, appid string) AppInfo {
 	if desktop, err := desktopfile.Read(filepath.Join(appsDir, appid+".desktop")); err == nil {
 		if name, ok := desktop.Get(desktopEntrySection, "Name"); ok && name != "" {
 			info.Name = name
+		}
+		if icon, ok := desktop.Get(desktopEntrySection, "Icon"); ok {
+			info.Icon = icon
 		}
 		if version, ok := desktop.Get(desktopEntrySection, "X-AppImage-Version"); ok {
 			info.Version = version
