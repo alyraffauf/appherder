@@ -1,4 +1,7 @@
 squashfs-root/
 *.appimage
+*.AppImage
+*.zsync
+AppDir/
 /appherder
 /result
