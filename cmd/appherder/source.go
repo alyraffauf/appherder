@@ -10,15 +10,17 @@ import (
 	"hash"
 	"os"
 	"strings"
+	"time"
 )
 
 // release describes the newest available build a source knows about.
 type release struct {
-	version string // human label, e.g. a release tag
-	url     string // download URL for the AppImage
-	sha256  string // hex sha256 of the asset, "" when unavailable
-	sha1    string // hex sha1 (zsync's hash), "" when unavailable
-	size    int64
+	version string    // human label, e.g. a release tag
+	url     string    // download URL for the AppImage
+	sha256  string    // hex sha256 of the asset, "" when unavailable
+	sha1    string    // hex sha1 (zsync's hash), "" when unavailable
+	size    int64     // content length, 0 when unavailable
+	modTime time.Time // server Last-Modified, for checksumless sources
 }
 
 // checksum returns the strongest hash the release carries with a hasher to
@@ -34,8 +36,7 @@ func (r release) checksum() (want string, h hash.Hash, ok bool) {
 }
 
 // localMatches reports whether file already equals this release, by the
-// strongest checksum available and falling back to size (a weak signal that
-// only distinguishes differently-sized builds).
+// strongest available signal: checksum, then mtime, then size.
 func (r release) localMatches(file string) (bool, error) {
 	if want, h, ok := r.checksum(); ok {
 		sum, err := fileSum(file, h)
@@ -44,11 +45,17 @@ func (r release) localMatches(file string) (bool, error) {
 		}
 		return strings.EqualFold(hex.EncodeToString(sum), want), nil
 	}
+
+	info, err := os.Stat(file)
+	if err != nil {
+		return false, err
+	}
+	// No checksum: current if the install is at least as new as the server's
+	// copy, else fall back to size.
+	if !r.modTime.IsZero() {
+		return !info.ModTime().Before(r.modTime), nil
+	}
 	if r.size > 0 {
-		info, err := os.Stat(file)
-		if err != nil {
-			return false, err
-		}
 		return info.Size() == r.size, nil
 	}
 	return false, nil
@@ -142,6 +149,12 @@ func parseUpdateInfo(info string) (source, error) {
 			return nil, fmt.Errorf("malformed zsync update info %q", info)
 		}
 		return zsyncURLSource{url: fields[1]}, nil
+	case "static":
+		// static|https://host/App-latest.AppImage (our convention)
+		if len(fields) != 2 || fields[1] == "" {
+			return nil, fmt.Errorf("malformed static update info %q", info)
+		}
+		return staticURLSource{url: fields[1]}, nil
 	default:
 		return nil, fmt.Errorf("unsupported update source %q", fields[0])
 	}
