@@ -193,6 +193,28 @@ func verifyAppImage(file, pinned string, want expectedChecksum) (fingerprint str
 	return fingerprint, nil
 }
 
+// appImageSigned reports whether file carries a signature, without verifying it
+// (verification happens at install). It reads only the section, not the whole
+// file, so it is cheap enough for listing.
+func appImageSigned(file string) bool {
+	sig, _, _, err := readSignatureSections(file)
+	return err == nil && len(bytes.TrimSpace(sig)) > 0
+}
+
+// signatureStatus summarizes an app's signature trust for display: "pinned" when
+// a signing key is locked in, "signed" when the AppImage carries an as-yet
+// unverified signature, "none" otherwise.
+func signatureStatus(pinned string, signed bool) string {
+	switch {
+	case pinned != "":
+		return "pinned"
+	case signed:
+		return "signed"
+	default:
+		return "none"
+	}
+}
+
 // pinnedSigningKey returns the fingerprint appherder pinned for appName, or "".
 func (a App) pinnedSigningKey(appName string) string {
 	desktop, err := desktopfile.Read(filepath.Join(a.applicationsDir, appName+".desktop"))

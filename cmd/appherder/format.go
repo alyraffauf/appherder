@@ -11,14 +11,14 @@ import (
 
 func printAppList(out io.Writer, infos []appherder.AppInfo) {
 	tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "NAME\tFILENAME\tVERSION\tSIZE\tSOURCE")
+	fmt.Fprintln(tw, "NAME\tFILENAME\tVERSION\tSIZE\tSOURCE\tSIGNATURE")
 	for _, info := range infos {
 		size := "-"
 		if info.Size > 0 {
 			size = humanSize(info.Size)
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
-			info.Name, orDash(info.Filename), orDash(info.Version), size, orDash(info.Source))
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
+			info.Name, orDash(info.Filename), orDash(info.Version), size, orDash(info.Source), info.Signature)
 	}
 	tw.Flush()
 }
