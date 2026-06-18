@@ -17,8 +17,6 @@ func (a App) Uninstall(name string, force bool) error {
 			if err != nil {
 				return err
 			}
-			// Leave launchers we didn't install (a name clash, or a pre-marker
-			// install); --force overrides this.
 			if !managed {
 				continue
 			}
@@ -27,6 +25,8 @@ func (a App) Uninstall(name string, force bool) error {
 			return fmt.Errorf("remove %s: %w", path, err)
 		}
 	}
+
+	_ = os.RemoveAll(filepath.Join(a.appimagesDir, ".versions", appName))
 
 	return nil
 }

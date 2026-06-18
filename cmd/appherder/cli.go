@@ -30,6 +30,7 @@ func newRootCommand(a appherder.App, stdout io.Writer, stderr io.Writer) *cobra.
 		newSyncCommand(a),
 		newMigrateCommand(a),
 		newUpgradeCommand(a),
+		newRollbackCommand(a),
 		newAutosyncCommand(),
 		newAutoupgradeCommand(),
 	)
@@ -172,6 +173,28 @@ func newUpgradeCommand(a appherder.App) *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&check, "check", false, "Report available updates without installing them")
 	return cmd
+}
+
+func newRollbackCommand(a appherder.App) *cobra.Command {
+	return &cobra.Command{
+		Use:   "rollback APP [VERSION]",
+		Short: "Restore a previously saved version",
+		Long: "Rolls the app back to a saved version. Without a version, the most recently\n" +
+			"saved one is restored. appherder saves the current version whenever it is\n" +
+			"replaced by an install or upgrade.",
+		Args: cobra.RangeArgs(1, 2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			version := ""
+			if len(args) > 1 {
+				version = args[1]
+			}
+			if err := a.Rollback(args[0], version); err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "rolled back %s\n", appherder.NormalizeAppName(args[0]))
+			return nil
+		},
+	}
 }
 
 func newAutoCommand(use, short, long, offHelp string, enable, disable func() error) *cobra.Command {

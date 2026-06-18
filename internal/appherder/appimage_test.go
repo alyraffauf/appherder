@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestAppImageSquashfsOffset(t *testing.T) {
@@ -187,4 +188,202 @@ func TestInstallAppImageNoOpWhenAlreadyCanonical(t *testing.T) {
 		t.Fatalf("dest = %q, want %q", got, dest)
 	}
 	assertExecutableFile(t, dest, "payload")
+}
+
+func TestSanitizeVersionForFilename(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"v1.2.3", "v1.2.3"},
+		{"2024/05/01", "2024_05_01"},
+		{"path\\separator", "path_separator"},
+		{"mixed/path\\thing", "mixed_path_thing"},
+	}
+	for _, tc := range tests {
+		if got := sanitizeVersionForFilename(tc.in); got != tc.want {
+			t.Fatalf("sanitizeVersionForFilename(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+
+	long := ""
+	for i := 0; i < 200; i++ {
+		long += "x"
+	}
+	if got := sanitizeVersionForFilename(long); len(got) != 100 {
+		t.Fatalf("expected truncated to 100, got %d", len(got))
+	}
+}
+
+func TestReadAppImageVersionFallsBackToMtime(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "not-an-appimage")
+	if err := os.WriteFile(file, []byte("hello"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fixed := time.Date(2026, 6, 18, 12, 0, 0, 0, time.UTC)
+	if err := os.Chtimes(file, fixed, fixed); err != nil {
+		t.Fatal(err)
+	}
+	if got := readAppImageVersion(file); got != "2026-06-18T120000" {
+		t.Fatalf("readAppImageVersion = %q, want 2026-06-18T120000", got)
+	}
+}
+
+func TestSaveToVersionsHardlinksFile(t *testing.T) {
+	a, home := newTestApp(t)
+	appimages := filepath.Join(home, "AppImages")
+	if err := os.MkdirAll(appimages, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	current := filepath.Join(appimages, "foo.appimage")
+	if err := os.WriteFile(current, []byte("v1"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := a.saveToVersions(current, "foo"); err != nil {
+		t.Fatal(err)
+	}
+
+	versionsDir := filepath.Join(appimages, ".versions", "foo")
+	entries, err := os.ReadDir(versionsDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 saved version, got %d", len(entries))
+	}
+	got, _ := os.ReadFile(filepath.Join(versionsDir, entries[0].Name()))
+	if string(got) != "v1" {
+		t.Fatalf("saved content = %q, want v1", string(got))
+	}
+}
+
+func TestSaveToVersionsNoopOnMissingFile(t *testing.T) {
+	a, _ := newTestApp(t)
+	if err := a.saveToVersions("/nonexistent/foo.appimage", "foo"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestInstallAppImageSavesPreviousVersion(t *testing.T) {
+	a, home := newTestApp(t)
+	appimages := filepath.Join(home, "AppImages")
+	if err := os.MkdirAll(appimages, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	current := filepath.Join(appimages, "foo.appimage")
+	if err := os.WriteFile(current, []byte("v1"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	src := filepath.Join(t.TempDir(), "Foo-2.0.AppImage")
+	if err := os.WriteFile(src, []byte("v2"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := a.installAppImage(src, "foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := os.ReadFile(current)
+	if string(got) != "v2" {
+		t.Fatalf("current = %q, want v2", string(got))
+	}
+
+	versionsDir := filepath.Join(appimages, ".versions", "foo")
+	entries, _ := os.ReadDir(versionsDir)
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 saved version, got %d", len(entries))
+	}
+	savedContent, _ := os.ReadFile(filepath.Join(versionsDir, entries[0].Name()))
+	if string(savedContent) != "v1" {
+		t.Fatalf("saved = %q, want v1", string(savedContent))
+	}
+}
+
+func TestInstallAppImageSavesPreviousVersionInFolder(t *testing.T) {
+	a, home := newTestApp(t)
+	appimages := filepath.Join(home, "AppImages")
+	if err := os.MkdirAll(appimages, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	current := filepath.Join(appimages, "foo.appimage")
+	if err := os.WriteFile(current, []byte("v1"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	src := filepath.Join(appimages, "Foo-2.0.appimage")
+	if err := os.WriteFile(src, []byte("v2"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := a.installAppImage(src, "foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := os.ReadFile(current)
+	if string(got) != "v2" {
+		t.Fatalf("current = %q, want v2", string(got))
+	}
+
+	if _, err := os.Stat(src); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("versioned source should be moved away")
+	}
+
+	versionsDir := filepath.Join(appimages, ".versions", "foo")
+	entries, _ := os.ReadDir(versionsDir)
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 saved version, got %d", len(entries))
+	}
+}
+
+func TestSaveToVersionsPrunesOldestVersions(t *testing.T) {
+	a, home := newTestApp(t)
+	appimages := filepath.Join(home, "AppImages")
+	if err := os.MkdirAll(appimages, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	versionsDir := filepath.Join(appimages, ".versions", "foo")
+	if err := os.MkdirAll(versionsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Seed 3 existing versions with distinct mtimes.
+	t1 := time.Now().Add(-3 * time.Hour)
+	t2 := time.Now().Add(-2 * time.Hour)
+	t3 := time.Now().Add(-1 * time.Hour)
+	for _, spec := range []struct {
+		name  string
+		mtime time.Time
+	}{
+		{"v1.appimage", t1},
+		{"v2.appimage", t2},
+		{"v3.appimage", t3},
+	} {
+		path := filepath.Join(versionsDir, spec.name)
+		os.WriteFile(path, []byte(spec.name), 0o644)
+		os.Chtimes(path, spec.mtime, spec.mtime)
+	}
+
+	current := filepath.Join(appimages, "foo.appimage")
+	if err := os.WriteFile(current, []byte("current"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Saving a 4th version should prune v1 (oldest)
+	if err := a.saveToVersions(current, "foo"); err != nil {
+		t.Fatal(err)
+	}
+
+	entries, _ := os.ReadDir(versionsDir)
+	if len(entries) != 3 {
+		t.Fatalf("expected 3 versions after prune, got %d", len(entries))
+	}
+	for _, entry := range entries {
+		if entry.Name() == "v1.appimage" {
+			t.Fatal("v1.appimage should have been pruned")
+		}
+	}
 }
