@@ -10,7 +10,7 @@ in
     pname = "appherder";
     inherit version;
     src = ./.;
-    vendorHash = "sha256-DW+OYl2Lr7j4ZGOD/Cml2/2yuauX4EudLRaYH15YtAA=";
+    vendorHash = "sha256-YoNtqb5dflJNCZBstAQxP458ktpUighC8uYuqFWjTyo=";
     subPackages = ["cmd/appherder"];
     ldflags = ["-X main.version=${version}"];
     nativeBuildInputs = [makeWrapper];

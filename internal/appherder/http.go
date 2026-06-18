@@ -50,9 +50,9 @@ func newIdleTimeoutReader(reader io.Reader, timeout time.Duration, cancel contex
 
 func (t *idleTimeoutReader) Read(buf []byte) (int, error) {
 	t.timer.Reset(t.timeout)
-	n, err := t.reader.Read(buf)
+	bytesRead, err := t.reader.Read(buf)
 	t.timer.Stop()
-	return n, err
+	return bytesRead, err
 }
 
 // httpGetOK sends a GET request and returns the response when the server

@@ -14,6 +14,7 @@ func newTestApp(t *testing.T) (App, string) {
 		filepath.Join(home, "AppImages"),
 		filepath.Join(home, ".local", "share", "applications"),
 		filepath.Join(home, "AppImages", ".icons"),
+		filepath.Join(home, ".local", "bin"),
 	), home
 }
 

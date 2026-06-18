@@ -6,12 +6,8 @@ import (
 	"path/filepath"
 )
 
-func (a App) localBinDir() string {
-	return filepath.Join(filepath.Dir(filepath.Dir(a.applicationsDir)), "bin")
-}
-
 func (a App) linkPath(appName string) string {
-	return filepath.Join(a.localBinDir(), appName)
+	return filepath.Join(a.binDir, appName)
 }
 
 func (a App) appImagePath(appName string) string {
@@ -24,9 +20,8 @@ func (a App) Link(appName string) error {
 	if _, err := os.Stat(src); err != nil {
 		return fmt.Errorf("%s is not installed", appName)
 	}
-	binDir := a.localBinDir()
-	if err := os.MkdirAll(binDir, 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", binDir, err)
+	if err := os.MkdirAll(a.binDir, 0o755); err != nil {
+		return fmt.Errorf("create %s: %w", a.binDir, err)
 	}
 	dst := a.linkPath(appName)
 	if err := os.Remove(dst); err != nil && !os.IsNotExist(err) {

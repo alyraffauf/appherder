@@ -5,6 +5,7 @@ go 1.25.0
 require (
 	github.com/CalebQ42/squashfs v1.4.1
 	github.com/ProtonMail/go-crypto v1.4.1
+	github.com/adrg/xdg v0.5.3
 	github.com/alyraffauf/goxdgdesktop v0.1.0
 	github.com/spf13/cobra v1.10.2
 )
