@@ -1,11 +1,11 @@
 [![CI](https://github.com/alyraffauf/appherder/actions/workflows/ci.yml/badge.svg)](https://github.com/alyraffauf/appherder/actions/workflows/ci.yml) [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](http://www.gnu.org/licenses/gpl-3.0) [![Ko-fi](https://img.shields.io/badge/Donate-Ko--fi-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/alyraffauf)
 
 <div align="center">
-  <h1>appherder</h1>
+  <h1>AppHerder</h1>
   <h3>A shepherd for your AppImages.</h3>
 </div>
 
-appherder automatically installs, removes, and upgrades your AppImages. Throw them in `~/AppImages` and appherder does the rest: apps appear in your menu, deleted ones disappear from it, and supported apps update in place.
+AppHerder automatically installs, removes, and upgrades your AppImages. Throw them in `~/AppImages` and AppHerder does the rest: apps appear in your menu, deleted ones disappear from it, and supported apps update in place.
 
 ## Features
 
@@ -85,7 +85,7 @@ appherder install ~/Downloads/Foo-x86_64.AppImage
 appherder install https://example.com/Foo.AppImage
 ```
 
-See what you have, remove what you don't:
+See what you have, remove what you don't want:
 
 ```bash
 appherder list
@@ -121,19 +121,19 @@ appherder rollback foo         # restore the version the last update replaced
 appherder rollback foo 1.2.3   # or restore a specific saved version
 ```
 
-appherder keeps the last few versions of each app and saves the current one whenever an install or upgrade replaces it.
+AppHerder keeps the last few versions of each app and saves the current one whenever an install or upgrade replaces it.
 
 Coming from another AppImage tool? `appherder migrate` adopts the ones in `~/AppImages` and clears out launchers whose AppImage is gone.
 
 ## Verified updates
 
-Some AppImages are signed by their publisher. The first time appherder installs a signed app, it pins that signing key. From then on, every update must be signed by the same key: an unsigned, tampered, or differently-signed build is refused instead of installed. Changing the trusted key is deliberate, so swapping publishers means uninstalling and reinstalling. Apps that aren't signed keep working as before; the pin only takes effect once a real signature has been seen.
+Some AppImages are signed by their publisher. The first time AppHerder installs a signed app, it pins that signing key. From then on, every update must be signed by the same key: an unsigned, tampered, or differently-signed build is refused instead of installed. Changing the trusted key is deliberate, so swapping publishers means uninstalling and reinstalling. Apps that aren't signed keep working as before; the pin only takes effect once a real signature has been seen.
 
 `appherder list` shows each app's status in the **SIGNATURE** column: `pinned` (key locked in), `signed` (carries a signature appherder hasn't pinned yet), or `none`.
 
 ## Under the hood
 
-appherder reads the AppImage's squashfs filesystem directly to grab its icon and desktop entry, then writes a launcher pointing back at the file in `~/AppImages`. It does this without ever running the AppImage, unlike tools that launch it to unpack. Everything it writes is tagged, so uninstall and sync only touch its own files.
+AppHerder reads the AppImage's filesystem directly to grab its icon and desktop entry, then writes a launcher pointing back at the file in `~/AppImages`. It does this without ever running the AppImage, unlike tools that launch it to unpack. Everything it writes is tagged, so uninstall and sync only touch its own files.
 
 ## License
 
