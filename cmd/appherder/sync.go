@@ -15,8 +15,9 @@ import (
 const installConcurrency = 4
 
 type syncResult struct {
-	file string
-	err  error
+	file    string
+	appName string
+	err     error
 }
 
 // sync reconciles ~/AppImages with installed state: install every AppImage in
@@ -31,25 +32,38 @@ func (a app) sync(ctx context.Context, out io.Writer, force bool) error {
 	}
 	appimagesDir := filepath.Join(home, "AppImages")
 
+	// Snapshot managed apps before installing, so we can report only newly
+	// installed ones instead of every already-present app.
+	existing, err := managedApps(home)
+	if err != nil {
+		return err
+	}
+	managed := make(map[string]bool, len(existing))
+	for _, appid := range existing {
+		managed[appid] = true
+	}
+
 	files, err := listAppImages(appimagesDir)
 	if err != nil {
 		return err
 	}
 
-	// parallelMap preserves input order, so skip output stays deterministic.
+	// parallelMap preserves input order, so output stays deterministic.
 	results := parallelMap(ctx, files, installConcurrency, func(_ context.Context, f string) syncResult {
-		return syncResult{file: f, err: a.install(f)}
+		name, err := a.install(f)
+		return syncResult{file: f, appName: name, err: err}
 	})
 	for _, result := range results {
 		if result.err != nil {
-			fmt.Fprintf(out, "skip %s: %v\n", filepath.Base(result.file), result.err)
+			fmt.Fprintf(out, "skipped %s: %v\n", filepath.Base(result.file), result.err)
+			continue
+		}
+		if !managed[result.appName] {
+			fmt.Fprintf(out, "installed %s\n", result.appName)
 		}
 	}
 
-	candidates, err := managedApps(home)
-	if err != nil {
-		return err
-	}
+	candidates := existing
 	if force {
 		extra, err := appImageBackedOrphans(home, appimagesDir)
 		if err != nil {
@@ -66,7 +80,7 @@ func (a app) sync(ctx context.Context, out io.Writer, force bool) error {
 			continue
 		}
 		if err := a.uninstall(appid, force); err != nil {
-			fmt.Fprintf(out, "skip remove %s: %v\n", appid, err)
+			fmt.Fprintf(out, "skipped removing %s: %v\n", appid, err)
 			continue
 		}
 		fmt.Fprintf(out, "removed %s\n", appid)

@@ -47,7 +47,7 @@ func (a app) upgrade(ctx context.Context, out io.Writer, checkOnly bool) error {
 	for _, check := range checks {
 		switch {
 		case check.err != nil:
-			fmt.Fprintf(out, "skip %s: %v\n", check.name, check.err)
+			fmt.Fprintf(out, "skipped %s: %v\n", check.name, check.err)
 			continue
 		case check.noSource || !check.available:
 			continue
@@ -60,7 +60,7 @@ func (a app) upgrade(ctx context.Context, out io.Writer, checkOnly bool) error {
 		}
 
 		if err := a.applyUpgrade(ctx, check.release); err != nil {
-			fmt.Fprintf(out, "skip %s: %v\n", check.name, err)
+			fmt.Fprintf(out, "skipped %s: %v\n", check.name, err)
 			continue
 		}
 		fmt.Fprintf(out, "upgraded %s to %s\n", check.name, check.release.version)
@@ -138,7 +138,8 @@ func (a app) applyUpgrade(ctx context.Context, rel release) error {
 		return err
 	}
 
-	return a.install(tmpName)
+	_, err = a.install(tmpName)
+	return err
 }
 
 func download(ctx context.Context, url string, writer io.Writer) error {

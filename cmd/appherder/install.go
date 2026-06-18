@@ -7,15 +7,15 @@ import (
 	"strings"
 )
 
-func (a app) install(appimage string) (err error) {
+func (a app) install(appimage string) (appName string, err error) {
 	appimage, err = filepath.Abs(appimage)
 	if err != nil {
-		return fmt.Errorf("resolve AppImage path %q: %w", appimage, err)
+		return "", fmt.Errorf("resolve AppImage path %q: %w", appimage, err)
 	}
 
 	fsys, closeAppImage, err := openAppImage(appimage)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer closeAppImage()
 
@@ -28,16 +28,16 @@ func (a app) install(appimage string) (err error) {
 
 	desktop, desktopName, err := findDesktopFile(fsys)
 	if err != nil {
-		return fmt.Errorf("find desktop file: %w", err)
+		return "", fmt.Errorf("find desktop file: %w", err)
 	}
 
 	icon := resolveIcon(fsys)
-	appName := deriveAppName(desktop, desktopName, appimage)
+	appName = deriveAppName(desktop, desktopName, appimage)
 
 	// Patch in memory before any filesystem writes so a failure here installs nothing.
 	if desktop != nil {
 		if err := a.patchDesktopFile(desktop, appName, icon != ""); err != nil {
-			return err
+			return "", err
 		}
 	}
 
@@ -53,7 +53,7 @@ func (a app) install(appimage string) (err error) {
 		dest, err := a.installIcon(fsys, icon, appName)
 		if err != nil {
 			rollback()
-			return err
+			return "", err
 		}
 		installed = append(installed, dest)
 	}
@@ -62,7 +62,7 @@ func (a app) install(appimage string) (err error) {
 		dest, err := a.installDesktopFile(desktop, appName)
 		if err != nil {
 			rollback()
-			return err
+			return "", err
 		}
 		installed = append(installed, dest)
 	}
@@ -72,10 +72,10 @@ func (a app) install(appimage string) (err error) {
 	// file.
 	if _, err := a.installAppImage(appimage, appName); err != nil {
 		rollback()
-		return err
+		return "", err
 	}
 
-	return nil
+	return appName, nil
 }
 
 // deriveAppName picks the canonical install name, matching GearLever so the

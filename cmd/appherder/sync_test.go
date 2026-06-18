@@ -65,7 +65,7 @@ func TestSyncKeepsManagedLauncherWhenAppImagePresent(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(home, ".local", "share", "applications", "present.desktop")); err != nil {
 		t.Fatalf("launcher for a present (if unparseable) AppImage should be kept: %v", err)
 	}
-	if !bytes.Contains(out.Bytes(), []byte("skip present.appimage:")) {
+	if !bytes.Contains(out.Bytes(), []byte("skipped present.appimage:")) {
 		t.Fatalf("sync output = %q, want a skip report for the bad file", out.String())
 	}
 }
