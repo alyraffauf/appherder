@@ -35,11 +35,18 @@ func (a App) Install(appimage string) (appName string, err error) {
 	icon := resolveIcon(fsys)
 	appName = deriveAppName(desktop, desktopName, appimage)
 
+	// No desktop file inside the AppImage: synthesize a terminal launcher so
+	// CLI apps still get a menu entry and are tracked by managedApps.
+	if desktop == nil {
+		desktop = parseDesktopFile([]byte(fmt.Sprintf(
+			"[Desktop Entry]\nType=Application\nName=%s\nTerminal=true\n",
+			appNameFromPath(appimage),
+		)))
+	}
+
 	// Patch in memory before any filesystem writes so a failure here installs nothing.
-	if desktop != nil {
-		if err := a.patchDesktopFile(desktop, appName, icon != ""); err != nil {
-			return "", err
-		}
+	if err := a.patchDesktopFile(desktop, appName, icon != ""); err != nil {
+		return "", err
 	}
 
 	// Roll back written files on a later failure rather than leaving a half-installed app.
@@ -59,14 +66,12 @@ func (a App) Install(appimage string) (appName string, err error) {
 		installed = append(installed, dest)
 	}
 
-	if desktop != nil {
-		dest, err := a.installDesktopFile(desktop, appName)
-		if err != nil {
-			rollback()
-			return "", err
-		}
-		installed = append(installed, dest)
+	dest, err := a.installDesktopFile(desktop, appName)
+	if err != nil {
+		rollback()
+		return "", err
 	}
+	installed = append(installed, dest)
 
 	// Materialize the AppImage last: when the source is already in ~/AppImages
 	// it gets moved, so an earlier failure must not roll back over the user's

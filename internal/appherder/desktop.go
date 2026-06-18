@@ -256,6 +256,8 @@ func (a App) patchDesktopFile(desktop *desktopFile, appName string, hasIcon bool
 
 	if execCmd, ok := desktop.get("Exec", desktopEntrySection); ok {
 		desktop.set("Exec", patchExecCommand(execCmd, appimage), desktopEntrySection)
+	} else {
+		desktop.set("Exec", appimage, desktopEntrySection)
 	}
 
 	for _, section := range desktop.sections {

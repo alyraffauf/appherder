@@ -137,6 +137,20 @@ func TestDeriveAppName(t *testing.T) {
 	}
 }
 
+func TestPatchDesktopFileSetsExecWhenMissing(t *testing.T) {
+	a := App{homeDir: func() (string, error) { return "/home/test", nil }}
+	desktop := parseDesktopFile([]byte(
+		"[Desktop Entry]\nType=Application\nName=Foo\nTerminal=true\n",
+	))
+	if err := a.patchDesktopFile(desktop, "foo", false); err != nil {
+		t.Fatal(err)
+	}
+	assertDesktopValue(t, desktop, desktopEntrySection, "Terminal", "true")
+	assertDesktopValue(t, desktop, desktopEntrySection, "TryExec", "/home/test/AppImages/foo.appimage")
+	assertDesktopValue(t, desktop, desktopEntrySection, "Exec", "/home/test/AppImages/foo.appimage")
+	assertDesktopValue(t, desktop, desktopEntrySection, desktopOwnerKey, "true")
+}
+
 func assertDesktopValue(t *testing.T, desktop *desktopFile, section string, key string, want string) {
 	t.Helper()
 
