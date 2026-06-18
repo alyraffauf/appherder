@@ -15,7 +15,7 @@ func newRootCommand(a app, stdout io.Writer, stderr io.Writer) *cobra.Command {
 	}
 	cmd.SetOut(stdout)
 	cmd.SetErr(stderr)
-	cmd.AddCommand(newInstallCommand(a), newUninstallCommand(a), newSyncCommand(a), newMigrateCommand(a), newUpgradeCommand(a))
+	cmd.AddCommand(newInstallCommand(a), newUninstallCommand(a), newSyncCommand(a), newMigrateCommand(a), newUpgradeCommand(a), newListCommand(a))
 	return cmd
 }
 
@@ -81,6 +81,17 @@ func newMigrateCommand(a app) *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return a.sync(cmd.Context(), cmd.OutOrStdout(), true)
+		},
+	}
+}
+
+func newListCommand(a app) *cobra.Command {
+	return &cobra.Command{
+		Use:   "list",
+		Short: "Show managed AppImages and their update sources",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return a.list(cmd.OutOrStdout())
 		},
 	}
 }

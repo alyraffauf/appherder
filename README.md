@@ -15,6 +15,7 @@ On its own, an AppImage is just an executable in a folder. No icon, no menu entr
 - **Upgrades replace instead of piling up.** appherder names an app by what's inside it, not the download's filename, so a newer version of `Foo` just replaces the old one.
 - **Checks for updates.** Reads the update info baked into each AppImage and fetches the latest from GitHub, GitLab, zsync, or a static URL. `appherder upgrade --check` shows what's new; `appherder upgrade` downloads and installs it.
 - **Won't touch your other apps.** It only removes launchers it made itself, so your Flatpaks, Snaps, and hand-made shortcuts are safe.
+- **Tells you what it manages.** `appherder list` shows every app it installed, where it checks for updates, and which ones are missing their AppImage.
 - **Quiet when nothing changed.** Re-installing an unchanged app does nothing. Drop your AppImages in one folder and `appherder sync` lines everything up.
 
 ## Installation
@@ -51,6 +52,7 @@ go build ./cmd/appherder
 ```bash
 appherder install ~/Downloads/Foo-x86_64.AppImage    # install one
 appherder uninstall foo                              # remove one
+appherder list                                       # see what's installed
 appherder sync                                       # match your apps to what's in ~/AppImages
 appherder upgrade --check                            # see what's out of date
 appherder upgrade                                    # download and install updates

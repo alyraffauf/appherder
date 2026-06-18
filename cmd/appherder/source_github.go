@@ -28,6 +28,8 @@ type ghRelease struct {
 	Assets  []ghAsset `json:"assets"`
 }
 
+func (githubReleaseSource) kind() string { return "github" }
+
 func (s githubReleaseSource) latest(ctx context.Context) (release, error) {
 	base := s.api
 	if base == "" {

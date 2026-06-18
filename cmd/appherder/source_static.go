@@ -14,6 +14,8 @@ type staticURLSource struct {
 	url string
 }
 
+func (staticURLSource) kind() string { return "static" }
+
 func (s staticURLSource) latest(ctx context.Context) (release, error) {
 	ctx, cancel := context.WithTimeout(ctx, apiTimeout)
 	defer cancel()

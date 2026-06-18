@@ -33,6 +33,8 @@ type glRelease struct {
 	} `json:"assets"`
 }
 
+func (gitlabReleaseSource) kind() string { return "gitlab" }
+
 func (s gitlabReleaseSource) latest(ctx context.Context) (release, error) {
 	base := s.api
 	if base == "" {

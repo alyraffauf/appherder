@@ -81,6 +81,7 @@ func (r release) verifyDownload(file string) error {
 // source resolves the latest available build of an installed app.
 type source interface {
 	latest(ctx context.Context) (release, error)
+	kind() string
 }
 
 // readUpdateInfo returns the AppImage's embedded update-information string from

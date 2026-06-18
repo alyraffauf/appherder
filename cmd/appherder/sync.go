@@ -101,22 +101,32 @@ func listAppImages(dir string) ([]string, error) {
 // appImagePresent reports whether <appid>.appimage exists in dir, matching the
 // extension case-insensitively.
 func appImagePresent(dir, appid string) (bool, error) {
+	path, err := findAppImagePath(dir, appid)
+	if err != nil {
+		return false, err
+	}
+	return path != "", nil
+}
+
+// findAppImagePath returns the full path of <appid>.appimage in dir, matching
+// the extension case-insensitively, or "" when absent.
+func findAppImagePath(dir, appid string) (string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return false, nil
+			return "", nil
 		}
-		return false, err
+		return "", err
 	}
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
 		}
 		if strings.EqualFold(entry.Name(), appid+".appimage") {
-			return true, nil
+			return filepath.Join(dir, entry.Name()), nil
 		}
 	}
-	return false, nil
+	return "", nil
 }
 
 // appImageBackedOrphans returns appids of unmanaged desktop entries whose

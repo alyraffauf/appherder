@@ -19,6 +19,8 @@ type zsyncURLSource struct {
 	url string
 }
 
+func (zsyncURLSource) kind() string { return "zsync" }
+
 func (s zsyncURLSource) latest(ctx context.Context) (release, error) {
 	header, err := fetchZsyncHeader(ctx, s.url)
 	if err != nil {
