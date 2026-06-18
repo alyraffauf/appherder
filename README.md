@@ -19,6 +19,14 @@ appherder automatically installs, removes, and upgrades your AppImages. Throw th
 
 ## Installation
 
+### Quick install
+
+```bash
+curl -sSL https://raw.githubusercontent.com/alyraffauf/appherder/main/scripts/install.sh | bash
+```
+
+This downloads the latest AppImage, installs it, and enables automatic sync and upgrades.
+
 ### Download a binary
 
 Grab `appherder-linux-amd64` from the [latest release](https://github.com/alyraffauf/appherder/releases/latest), then:
@@ -27,6 +35,19 @@ Grab `appherder-linux-amd64` from the [latest release](https://github.com/alyraf
 chmod +x appherder-linux-amd64
 sudo mv appherder-linux-amd64 /usr/local/bin/appherder
 ```
+
+### AppImage
+
+Download the `.AppImage` from the [latest release](https://github.com/alyraffauf/appherder/releases/latest), then:
+
+```bash
+chmod +x appherder-*-x86_64.AppImage
+./appherder-*-x86_64.AppImage install ./appherder-*-x86_64.AppImage
+appherder autosync
+appherder autoupgrade
+```
+
+The install step copies it into `~/AppImages` and links it to `~/.local/bin/appherder` automatically.
 
 ### Nix flake
 
