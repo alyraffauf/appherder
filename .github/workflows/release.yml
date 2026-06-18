@@ -41,7 +41,7 @@ jobs:
           EOF
 
           # Desktop entry
-          cat > AppDir/appherder.desktop << 'EOF'
+          cat > AppDir/appherder.desktop << EOF
           [Desktop Entry]
           Type=Application
           Name=AppHerder
@@ -50,6 +50,7 @@ jobs:
           Icon=appherder
           Terminal=true
           Categories=Utility;
+          X-AppImage-Version=$GITHUB_REF_NAME
           X-AppImage-Integrate=false
           EOF
 
