@@ -7,7 +7,7 @@ import (
 )
 
 func TestListShowsInstalledAndOrphaned(t *testing.T) {
-	home := t.TempDir()
+	a, home := newTestApp(t)
 	appimages := filepath.Join(home, "AppImages")
 	appsDir := filepath.Join(home, ".local", "share", "applications")
 	if err := os.MkdirAll(appsDir, 0o755); err != nil {
@@ -38,7 +38,6 @@ func TestListShowsInstalledAndOrphaned(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	a := App{homeDir: func() (string, error) { return home, nil }}
 	infos, err := a.List()
 	if err != nil {
 		t.Fatal(err)
@@ -72,8 +71,7 @@ func TestListShowsInstalledAndOrphaned(t *testing.T) {
 }
 
 func TestListEmptyWhenNothingManaged(t *testing.T) {
-	home := t.TempDir()
-	a := App{homeDir: func() (string, error) { return home, nil }}
+	a, _ := newTestApp(t)
 	infos, err := a.List()
 	if err != nil {
 		t.Fatal(err)
@@ -84,7 +82,7 @@ func TestListEmptyWhenNothingManaged(t *testing.T) {
 }
 
 func TestListFallsBackToFilenameForName(t *testing.T) {
-	home := t.TempDir()
+	a, home := newTestApp(t)
 	appimages := filepath.Join(home, "AppImages")
 	appsDir := filepath.Join(home, ".local", "share", "applications")
 	if err := os.MkdirAll(appimages, 0o755); err != nil {
@@ -104,7 +102,6 @@ func TestListFallsBackToFilenameForName(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	a := App{homeDir: func() (string, error) { return home, nil }}
 	infos, err := a.List()
 	if err != nil {
 		t.Fatal(err)

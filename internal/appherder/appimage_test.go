@@ -58,12 +58,11 @@ func assertExecutableFile(t *testing.T, path, want string) {
 }
 
 func TestInstallAppImageCopiesFromElsewhere(t *testing.T) {
-	home := t.TempDir()
+	a, home := newTestApp(t)
 	src := filepath.Join(t.TempDir(), "Foo-1.0-x86_64.AppImage")
 	if err := os.WriteFile(src, []byte("payload"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	a := App{homeDir: func() (string, error) { return home, nil }}
 
 	dest, err := a.installAppImage(src, "foo")
 	if err != nil {
@@ -79,7 +78,7 @@ func TestInstallAppImageCopiesFromElsewhere(t *testing.T) {
 }
 
 func TestInstallAppImageMovesVersionedFileInPlace(t *testing.T) {
-	home := t.TempDir()
+	a, home := newTestApp(t)
 	appimages := filepath.Join(home, "AppImages")
 	if err := os.MkdirAll(appimages, 0o755); err != nil {
 		t.Fatal(err)
@@ -88,7 +87,6 @@ func TestInstallAppImageMovesVersionedFileInPlace(t *testing.T) {
 	if err := os.WriteFile(src, []byte("payload"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	a := App{homeDir: func() (string, error) { return home, nil }}
 
 	dest, err := a.installAppImage(src, "foo")
 	if err != nil {
@@ -101,7 +99,7 @@ func TestInstallAppImageMovesVersionedFileInPlace(t *testing.T) {
 }
 
 func TestInstallAppImageSkipsCopyWhenIdentical(t *testing.T) {
-	home := t.TempDir()
+	a, home := newTestApp(t)
 	appimages := filepath.Join(home, "AppImages")
 	if err := os.MkdirAll(appimages, 0o755); err != nil {
 		t.Fatal(err)
@@ -119,7 +117,6 @@ func TestInstallAppImageSkipsCopyWhenIdentical(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a := App{homeDir: func() (string, error) { return home, nil }}
 	if _, err := a.installAppImage(src, "foo"); err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +134,7 @@ func TestInstallAppImageSkipsCopyWhenIdentical(t *testing.T) {
 }
 
 func TestInstallAppImageRemovesIdenticalDuplicateInFolder(t *testing.T) {
-	home := t.TempDir()
+	a, home := newTestApp(t)
 	appimages := filepath.Join(home, "AppImages")
 	if err := os.MkdirAll(appimages, 0o755); err != nil {
 		t.Fatal(err)
@@ -155,7 +152,6 @@ func TestInstallAppImageRemovesIdenticalDuplicateInFolder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a := App{homeDir: func() (string, error) { return home, nil }}
 	if _, err := a.installAppImage(dup, "foo"); err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +169,7 @@ func TestInstallAppImageRemovesIdenticalDuplicateInFolder(t *testing.T) {
 }
 
 func TestInstallAppImageNoOpWhenAlreadyCanonical(t *testing.T) {
-	home := t.TempDir()
+	a, home := newTestApp(t)
 	appimages := filepath.Join(home, "AppImages")
 	if err := os.MkdirAll(appimages, 0o755); err != nil {
 		t.Fatal(err)
@@ -182,7 +178,6 @@ func TestInstallAppImageNoOpWhenAlreadyCanonical(t *testing.T) {
 	if err := os.WriteFile(dest, []byte("payload"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	a := App{homeDir: func() (string, error) { return home, nil }}
 
 	got, err := a.installAppImage(dest, "foo")
 	if err != nil {

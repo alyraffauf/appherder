@@ -15,8 +15,7 @@ func TestInstallFromURLDownloadsAndCleansUp(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	home := t.TempDir()
-	a := App{homeDir: func() (string, error) { return home, nil }}
+	a, _ := newTestApp(t)
 	_, err := a.InstallFromURL(context.Background(), srv.URL+"/Foo.AppImage")
 	if err == nil {
 		t.Fatal("expected error for non-AppImage content")
@@ -34,8 +33,7 @@ func TestInstallFromURLHandlesDownloadFailure(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	home := t.TempDir()
-	a := App{homeDir: func() (string, error) { return home, nil }}
+	a, _ := newTestApp(t)
 	if _, err := a.InstallFromURL(context.Background(), srv.URL+"/Foo.AppImage"); err == nil {
 		t.Fatal("expected error for 404 download")
 	}

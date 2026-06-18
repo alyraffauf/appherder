@@ -10,7 +10,12 @@ import (
 var version = "dev"
 
 func main() {
-	cmd := newRootCommand(appherder.NewApp(), os.Stdout, os.Stderr)
+	app, err := appherder.NewApp()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	cmd := newRootCommand(app, os.Stdout, os.Stderr)
 	cmd.SetArgs(os.Args[1:])
 	if err := cmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

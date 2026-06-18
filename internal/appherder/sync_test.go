@@ -8,26 +8,13 @@ import (
 	"testing"
 )
 
-// writeManagedDesktop stamps a launcher with appherder's ownership marker.
-func writeManagedDesktop(t *testing.T, home, appid string) {
-	t.Helper()
-	dir := filepath.Join(home, ".local", "share", "applications")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, appid+".desktop"), []byte(managedDesktop), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestSyncRemovesOrphanedManagedLauncher(t *testing.T) {
-	home := t.TempDir()
+	a, home := newTestApp(t)
 	if err := os.MkdirAll(filepath.Join(home, "AppImages"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	writeManagedDesktop(t, home, "gone")
 
-	a := App{homeDir: func() (string, error) { return home, nil }}
 	result, err := a.Sync(context.Background(), false)
 	if err != nil {
 		t.Fatal(err)
@@ -42,7 +29,7 @@ func TestSyncRemovesOrphanedManagedLauncher(t *testing.T) {
 }
 
 func TestSyncKeepsManagedLauncherWhenAppImagePresent(t *testing.T) {
-	home := t.TempDir()
+	a, home := newTestApp(t)
 	appimages := filepath.Join(home, "AppImages")
 	if err := os.MkdirAll(appimages, 0o755); err != nil {
 		t.Fatal(err)
@@ -54,7 +41,6 @@ func TestSyncKeepsManagedLauncherWhenAppImagePresent(t *testing.T) {
 	}
 	writeManagedDesktop(t, home, "present")
 
-	a := App{homeDir: func() (string, error) { return home, nil }}
 	result, err := a.Sync(context.Background(), false)
 	if err != nil {
 		t.Fatal(err)
@@ -69,7 +55,7 @@ func TestSyncKeepsManagedLauncherWhenAppImagePresent(t *testing.T) {
 }
 
 func TestSyncKeepsUnmanagedLauncherEvenWhenAppImageAbsent(t *testing.T) {
-	home := t.TempDir()
+	a, home := newTestApp(t)
 	if err := os.MkdirAll(filepath.Join(home, "AppImages"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +69,6 @@ func TestSyncKeepsUnmanagedLauncherEvenWhenAppImageAbsent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	a := App{homeDir: func() (string, error) { return home, nil }}
 	for _, force := range []bool{false, true} {
 		if _, err := a.Sync(context.Background(), force); err != nil {
 			t.Fatal(err)
@@ -95,7 +80,7 @@ func TestSyncKeepsUnmanagedLauncherEvenWhenAppImageAbsent(t *testing.T) {
 }
 
 func TestSyncForceRemovesAppImageBackedOrphan(t *testing.T) {
-	home := t.TempDir()
+	a, home := newTestApp(t)
 	appimages := filepath.Join(home, "AppImages")
 	if err := os.MkdirAll(appimages, 0o755); err != nil {
 		t.Fatal(err)
@@ -111,7 +96,6 @@ func TestSyncForceRemovesAppImageBackedOrphan(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	a := App{homeDir: func() (string, error) { return home, nil }}
 	result, err := a.Sync(context.Background(), true)
 	if err != nil {
 		t.Fatal(err)
@@ -125,7 +109,7 @@ func TestSyncForceRemovesAppImageBackedOrphan(t *testing.T) {
 }
 
 func TestSyncForceKeepsOrphanWhenAppImageStillPresent(t *testing.T) {
-	home := t.TempDir()
+	a, home := newTestApp(t)
 	appimages := filepath.Join(home, "AppImages")
 	if err := os.MkdirAll(appimages, 0o755); err != nil {
 		t.Fatal(err)
@@ -144,7 +128,6 @@ func TestSyncForceKeepsOrphanWhenAppImageStillPresent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	a := App{homeDir: func() (string, error) { return home, nil }}
 	if _, err := a.Sync(context.Background(), true); err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +137,7 @@ func TestSyncForceKeepsOrphanWhenAppImageStillPresent(t *testing.T) {
 }
 
 func TestSyncIgnoresHiddenAndTempFiles(t *testing.T) {
-	home := t.TempDir()
+	a, home := newTestApp(t)
 	appimages := filepath.Join(home, "AppImages")
 	if err := os.MkdirAll(appimages, 0o755); err != nil {
 		t.Fatal(err)
@@ -166,7 +149,6 @@ func TestSyncIgnoresHiddenAndTempFiles(t *testing.T) {
 		}
 	}
 
-	a := App{homeDir: func() (string, error) { return home, nil }}
 	result, err := a.Sync(context.Background(), false)
 	if err != nil {
 		t.Fatal(err)
@@ -177,10 +159,9 @@ func TestSyncIgnoresHiddenAndTempFiles(t *testing.T) {
 }
 
 func TestSyncHandlesMissingAppImagesDir(t *testing.T) {
-	home := t.TempDir()
+	a, home := newTestApp(t)
 	writeManagedDesktop(t, home, "orphan")
 
-	a := App{homeDir: func() (string, error) { return home, nil }}
 	if _, err := a.Sync(context.Background(), false); err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +171,7 @@ func TestSyncHandlesMissingAppImagesDir(t *testing.T) {
 }
 
 func TestSyncReportsSkipsInInputOrder(t *testing.T) {
-	home := t.TempDir()
+	a, home := newTestApp(t)
 	appimages := filepath.Join(home, "AppImages")
 	if err := os.MkdirAll(appimages, 0o755); err != nil {
 		t.Fatal(err)
@@ -202,7 +183,6 @@ func TestSyncReportsSkipsInInputOrder(t *testing.T) {
 		}
 	}
 
-	a := App{homeDir: func() (string, error) { return home, nil }}
 	result, err := a.Sync(context.Background(), false)
 	if err != nil {
 		t.Fatal(err)

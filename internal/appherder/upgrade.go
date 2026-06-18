@@ -36,11 +36,7 @@ type UpgradeApplied struct {
 // already current are included with NoSource/Available=false so the caller
 // can decide what to show.
 func (a App) CheckUpgrades(ctx context.Context) ([]UpgradeCheck, error) {
-	home, err := a.homeDir()
-	if err != nil {
-		return nil, fmt.Errorf("resolve home directory: %w", err)
-	}
-	files, err := listAppImages(filepath.Join(home, "AppImages"))
+	files, err := listAppImages(a.appimagesDir)
 	if err != nil {
 		return nil, err
 	}

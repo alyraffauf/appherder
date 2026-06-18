@@ -97,18 +97,12 @@ func appImageSquashfsOffset(reader io.ReaderAt) (int64, error) {
 }
 
 func (a App) installAppImage(file string, appName string) (string, error) {
-	home, err := a.homeDir()
-	if err != nil {
-		return "", fmt.Errorf("resolve home directory: %w", err)
+	if err := os.MkdirAll(a.appimagesDir, 0o755); err != nil {
+		return "", fmt.Errorf("create AppImages directory %s: %w", a.appimagesDir, err)
 	}
 
-	appimagesDir := filepath.Join(home, "AppImages")
-	if err := os.MkdirAll(appimagesDir, 0o755); err != nil {
-		return "", fmt.Errorf("create AppImages directory %s: %w", appimagesDir, err)
-	}
-
-	dest := filepath.Join(appimagesDir, appName+".appimage")
-	inFolder := samePath(filepath.Dir(file), appimagesDir)
+	dest := filepath.Join(a.appimagesDir, appName+".appimage")
+	inFolder := samePath(filepath.Dir(file), a.appimagesDir)
 
 	if !samePath(file, dest) {
 		same, err := sameContent(file, dest)

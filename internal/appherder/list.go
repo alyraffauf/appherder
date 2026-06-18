@@ -1,7 +1,6 @@
 package appherder
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -20,22 +19,14 @@ type AppInfo struct {
 // List returns display metadata for every app appherder manages. Offline and
 // instant; use CheckUpgrades to see what's stale.
 func (a App) List() ([]AppInfo, error) {
-	home, err := a.homeDir()
-	if err != nil {
-		return nil, fmt.Errorf("resolve home directory: %w", err)
-	}
-
-	appids, err := managedApps(home)
+	appids, err := managedApps(a.applicationsDir)
 	if err != nil {
 		return nil, err
 	}
 
-	appimagesDir := filepath.Join(home, "AppImages")
-	appsDir := filepath.Join(home, ".local", "share", "applications")
-
 	infos := make([]AppInfo, 0, len(appids))
 	for _, appid := range appids {
-		infos = append(infos, gatherAppInfo(appsDir, appimagesDir, appid))
+		infos = append(infos, gatherAppInfo(a.applicationsDir, a.appimagesDir, appid))
 	}
 	sort.Slice(infos, func(i, j int) bool { return infos[i].Name < infos[j].Name })
 	return infos, nil

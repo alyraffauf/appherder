@@ -137,8 +137,8 @@ func isManagedDesktop(path string) (bool, error) {
 
 // managedApps returns the ids of desktop entries appherder installed, found by
 // scanning the user applications directory for the ownership marker.
-func managedApps(home string) ([]string, error) {
-	matches, err := filepath.Glob(filepath.Join(home, ".local", "share", "applications", "*.desktop"))
+func managedApps(applicationsDir string) ([]string, error) {
+	matches, err := filepath.Glob(filepath.Join(applicationsDir, "*.desktop"))
 	if err != nil {
 		return nil, err
 	}
@@ -240,17 +240,11 @@ func (d *desktopFile) write(path string) error {
 }
 
 func (a App) patchDesktopFile(desktop *desktopFile, appName string, hasIcon bool) error {
-	home, err := a.homeDir()
-	if err != nil {
-		return fmt.Errorf("resolve home directory: %w", err)
-	}
-
-	appimages := filepath.Join(home, "AppImages")
-	appimage := filepath.Join(appimages, appName+".appimage")
+	appimage := filepath.Join(a.appimagesDir, appName+".appimage")
 
 	desktop.set(desktopOwnerKey, "true", desktopEntrySection)
 	if hasIcon {
-		desktop.set("Icon", filepath.Join(appimages, ".icons", appName), desktopEntrySection)
+		desktop.set("Icon", filepath.Join(a.iconsDir, appName), desktopEntrySection)
 	}
 	desktop.set("TryExec", appimage, desktopEntrySection)
 
@@ -273,12 +267,7 @@ func (a App) patchDesktopFile(desktop *desktopFile, appName string, hasIcon bool
 }
 
 func (a App) installDesktopFile(desktop *desktopFile, appName string) (string, error) {
-	home, err := a.homeDir()
-	if err != nil {
-		return "", fmt.Errorf("resolve home directory: %w", err)
-	}
-
-	dest := filepath.Join(home, ".local", "share", "applications", appName+".desktop")
+	dest := filepath.Join(a.applicationsDir, appName+".desktop")
 	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 		return "", fmt.Errorf("create desktop file directory %s: %w", filepath.Dir(dest), err)
 	}

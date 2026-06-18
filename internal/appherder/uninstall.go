@@ -10,12 +10,8 @@ import (
 
 func (a App) Uninstall(name string, force bool) error {
 	appName := NormalizeAppName(name)
-	home, err := a.homeDir()
-	if err != nil {
-		return fmt.Errorf("resolve home directory: %w", err)
-	}
 
-	for _, path := range installedPaths(home, appName) {
+	for _, path := range a.installedPaths(appName) {
 		if strings.HasSuffix(path, ".desktop") && !force {
 			managed, err := isManagedDesktop(path)
 			if err != nil {
@@ -44,10 +40,10 @@ func NormalizeAppName(name string) string {
 	return name
 }
 
-func installedPaths(home string, appName string) []string {
+func (a App) installedPaths(appName string) []string {
 	return []string{
-		filepath.Join(home, "AppImages", appName+".appimage"),
-		filepath.Join(home, "AppImages", ".icons", appName),
-		filepath.Join(home, ".local", "share", "applications", appName+".desktop"),
+		filepath.Join(a.appimagesDir, appName+".appimage"),
+		filepath.Join(a.iconsDir, appName),
+		filepath.Join(a.applicationsDir, appName+".desktop"),
 	}
 }

@@ -29,8 +29,8 @@ func TestNormalizeAppNameAcceptsNamesAndAppImagePaths(t *testing.T) {
 }
 
 func TestUninstallRemovesInstalledFilesOnly(t *testing.T) {
-	home := t.TempDir()
-	for _, path := range installedPaths(home, "example") {
+	a, home := newTestApp(t)
+	for _, path := range a.installedPaths("example") {
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -43,12 +43,11 @@ func TestUninstallRemovesInstalledFilesOnly(t *testing.T) {
 		}
 	}
 
-	a := App{homeDir: func() (string, error) { return home, nil }}
 	if err := a.Uninstall(filepath.Join(home, "AppImages", "example.AppImage"), false); err != nil {
 		t.Fatal(err)
 	}
 
-	for _, path := range installedPaths(home, "example") {
+	for _, path := range a.installedPaths("example") {
 		if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
 			t.Fatalf("expected %s to be removed, stat err: %v", path, err)
 		}
@@ -56,7 +55,7 @@ func TestUninstallRemovesInstalledFilesOnly(t *testing.T) {
 }
 
 func TestUninstallKeepsUnmanagedDesktopFile(t *testing.T) {
-	home := t.TempDir()
+	a, home := newTestApp(t)
 	desktop := filepath.Join(home, ".local", "share", "applications", "example.desktop")
 	if err := os.MkdirAll(filepath.Dir(desktop), 0o755); err != nil {
 		t.Fatal(err)
@@ -66,7 +65,6 @@ func TestUninstallKeepsUnmanagedDesktopFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	a := App{homeDir: func() (string, error) { return home, nil }}
 	if err := a.Uninstall("example", false); err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +82,7 @@ func TestUninstallKeepsUnmanagedDesktopFile(t *testing.T) {
 }
 
 func TestManagedApps(t *testing.T) {
-	home := t.TempDir()
+	_, home := newTestApp(t)
 	dir := filepath.Join(home, ".local", "share", "applications")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -96,7 +94,7 @@ func TestManagedApps(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := managedApps(home)
+	got, err := managedApps(dir)
 	if err != nil {
 		t.Fatal(err)
 	}

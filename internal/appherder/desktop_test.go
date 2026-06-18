@@ -49,14 +49,13 @@ func TestDesktopFileRoundTripMatchesInput(t *testing.T) {
 }
 
 func TestPatchDesktopFilePreservesDesktopActions(t *testing.T) {
+	a, home := newTestApp(t)
+
 	dir := t.TempDir()
 	source := filepath.Join(dir, "source.desktop")
-	output := filepath.Join(dir, "output.desktop")
 	if err := os.WriteFile(source, []byte(sampleDesktopFile), 0o644); err != nil {
 		t.Fatal(err)
 	}
-
-	a := App{homeDir: func() (string, error) { return "/home/test", nil }}
 
 	desktop, err := readDesktopFile(source)
 	if err != nil {
@@ -65,6 +64,7 @@ func TestPatchDesktopFilePreservesDesktopActions(t *testing.T) {
 	if err := a.patchDesktopFile(desktop, "example", true); err != nil {
 		t.Fatal(err)
 	}
+	output := filepath.Join(dir, "output.desktop")
 	if err := desktop.write(output); err != nil {
 		t.Fatal(err)
 	}
@@ -75,11 +75,11 @@ func TestPatchDesktopFilePreservesDesktopActions(t *testing.T) {
 	}
 
 	assertDesktopValue(t, patched, desktopEntrySection, desktopOwnerKey, "true")
-	assertDesktopValue(t, patched, desktopEntrySection, "Icon", "/home/test/AppImages/.icons/example")
-	assertDesktopValue(t, patched, desktopEntrySection, "TryExec", "/home/test/AppImages/example.appimage")
-	assertDesktopExec(t, patched, desktopEntrySection, []string{"env", "FOO=bar", "DESKTOPINTEGRATION=1", "/home/test/AppImages/example.appimage", "%U"})
-	assertDesktopExec(t, patched, "Desktop Action new-window", []string{"env", "DESKTOPINTEGRATION=1", "/home/test/AppImages/example.appimage", "--new-window", "%U"})
-	assertDesktopExec(t, patched, "Desktop Action new-private-window", []string{"env", "DESKTOPINTEGRATION=1", "/home/test/AppImages/example.appimage", "--private-window", "%U"})
+	assertDesktopValue(t, patched, desktopEntrySection, "Icon", filepath.Join(home, "AppImages", ".icons", "example"))
+	assertDesktopValue(t, patched, desktopEntrySection, "TryExec", filepath.Join(home, "AppImages", "example.appimage"))
+	assertDesktopExec(t, patched, desktopEntrySection, []string{"env", "FOO=bar", "DESKTOPINTEGRATION=1", filepath.Join(home, "AppImages", "example.appimage"), "%U"})
+	assertDesktopExec(t, patched, "Desktop Action new-window", []string{"env", "DESKTOPINTEGRATION=1", filepath.Join(home, "AppImages", "example.appimage"), "--new-window", "%U"})
+	assertDesktopExec(t, patched, "Desktop Action new-private-window", []string{"env", "DESKTOPINTEGRATION=1", filepath.Join(home, "AppImages", "example.appimage"), "--private-window", "%U"})
 	assertDesktopValue(t, patched, "Desktop Action new-private-window", "Name", "New Private Window")
 }
 
@@ -138,7 +138,7 @@ func TestDeriveAppName(t *testing.T) {
 }
 
 func TestPatchDesktopFileSetsExecWhenMissing(t *testing.T) {
-	a := App{homeDir: func() (string, error) { return "/home/test", nil }}
+	a, home := newTestApp(t)
 	desktop := parseDesktopFile([]byte(
 		"[Desktop Entry]\nType=Application\nName=Foo\nTerminal=true\n",
 	))
@@ -146,8 +146,8 @@ func TestPatchDesktopFileSetsExecWhenMissing(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertDesktopValue(t, desktop, desktopEntrySection, "Terminal", "true")
-	assertDesktopValue(t, desktop, desktopEntrySection, "TryExec", "/home/test/AppImages/foo.appimage")
-	assertDesktopValue(t, desktop, desktopEntrySection, "Exec", "/home/test/AppImages/foo.appimage")
+	assertDesktopValue(t, desktop, desktopEntrySection, "TryExec", filepath.Join(home, "AppImages", "foo.appimage"))
+	assertDesktopValue(t, desktop, desktopEntrySection, "Exec", filepath.Join(home, "AppImages", "foo.appimage"))
 	assertDesktopValue(t, desktop, desktopEntrySection, desktopOwnerKey, "true")
 }
 

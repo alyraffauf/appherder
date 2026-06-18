@@ -40,13 +40,7 @@ type SyncResult struct {
 // (entries left by another tool). Per-file errors are included in the result
 // rather than aborting the pass.
 func (a App) Sync(ctx context.Context, force bool) (SyncResult, error) {
-	home, err := a.homeDir()
-	if err != nil {
-		return SyncResult{}, fmt.Errorf("resolve home directory: %w", err)
-	}
-	appimagesDir := filepath.Join(home, "AppImages")
-
-	existing, err := managedApps(home)
+	existing, err := managedApps(a.applicationsDir)
 	if err != nil {
 		return SyncResult{}, err
 	}
@@ -55,7 +49,7 @@ func (a App) Sync(ctx context.Context, force bool) (SyncResult, error) {
 		managed[appid] = true
 	}
 
-	files, err := listAppImages(appimagesDir)
+	files, err := listAppImages(a.appimagesDir)
 	if err != nil {
 		return SyncResult{}, err
 	}
@@ -76,14 +70,14 @@ func (a App) Sync(ctx context.Context, force bool) (SyncResult, error) {
 
 	candidates := existing
 	if force {
-		extra, err := appImageBackedOrphans(home, appimagesDir)
+		extra, err := appImageBackedOrphans(a.applicationsDir, a.appimagesDir)
 		if err != nil {
 			return result, err
 		}
 		candidates = append(candidates, extra...)
 	}
 	for _, appid := range candidates {
-		present, err := appImagePresent(appimagesDir, appid)
+		present, err := appImagePresent(a.appimagesDir, appid)
 		if err != nil {
 			return result, err
 		}
@@ -157,9 +151,8 @@ func findAppImagePath(dir, appid string) (string, error) {
 // appImageBackedOrphans returns appids of unmanaged desktop entries whose
 // TryExec or Exec points at a missing file inside appimagesDir — launchers left
 // by another tool after their AppImage was deleted.
-func appImageBackedOrphans(home, appimagesDir string) ([]string, error) {
-	appsDir := filepath.Join(home, ".local", "share", "applications")
-	matches, err := filepath.Glob(filepath.Join(appsDir, "*.desktop"))
+func appImageBackedOrphans(applicationsDir, appimagesDir string) ([]string, error) {
+	matches, err := filepath.Glob(filepath.Join(applicationsDir, "*.desktop"))
 	if err != nil {
 		return nil, err
 	}
