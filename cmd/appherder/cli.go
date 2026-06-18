@@ -174,40 +174,44 @@ func newUpgradeCommand(a appherder.App) *cobra.Command {
 	return cmd
 }
 
-func newAutosyncCommand() *cobra.Command {
+func newAutoCommand(use, short, long, offHelp string, enable, disable func() error) *cobra.Command {
 	var off bool
 	cmd := &cobra.Command{
-		Use:   "autosync",
-		Short: "Enable or disable automatic sync when AppImages change",
-		Long: "Installs a systemd user unit that watches ~/AppImages and runs sync whenever a\n" +
-			"file is added or removed. No root required.",
-		Args: cobra.NoArgs,
+		Use:   use,
+		Short: short,
+		Long:  long,
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if off {
-				return disableAutosync()
+				return disable()
 			}
-			return enableAutosync()
+			return enable()
 		},
 	}
-	cmd.Flags().BoolVar(&off, "off", false, "Disable and remove the autosync watcher")
+	cmd.Flags().BoolVar(&off, "off", false, offHelp)
 	return cmd
 }
 
+func newAutosyncCommand() *cobra.Command {
+	return newAutoCommand(
+		"autosync",
+		"Enable or disable automatic sync when AppImages change",
+		"Installs a systemd user unit that watches ~/AppImages and runs sync whenever a\n"+
+			"file is added or removed. No root required.",
+		"Disable and remove the autosync watcher",
+		func() error { return enableUnits(syncUnits) },
+		func() error { return disableUnits(syncUnits) },
+	)
+}
+
 func newAutoupgradeCommand() *cobra.Command {
-	var off bool
-	cmd := &cobra.Command{
-		Use:   "autoupgrade",
-		Short: "Enable or disable daily automatic upgrades",
-		Long: "Installs a systemd user timer that checks for and installs AppImage updates\n" +
+	return newAutoCommand(
+		"autoupgrade",
+		"Enable or disable daily automatic upgrades",
+		"Installs a systemd user timer that checks for and installs AppImage updates\n"+
 			"once a day. No root required.",
-		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if off {
-				return disableAutoupgrade()
-			}
-			return enableAutoupgrade()
-		},
-	}
-	cmd.Flags().BoolVar(&off, "off", false, "Disable and remove the upgrade timer")
-	return cmd
+		"Disable and remove the upgrade timer",
+		func() error { return enableUnits(upgradeUnits) },
+		func() error { return disableUnits(upgradeUnits) },
+	)
 }

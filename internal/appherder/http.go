@@ -2,6 +2,7 @@ package appherder
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -52,4 +53,26 @@ func (t *idleTimeoutReader) Read(buf []byte) (int, error) {
 	n, err := t.reader.Read(buf)
 	t.timer.Stop()
 	return n, err
+}
+
+// httpGetOK sends a GET request and returns the response when the server
+// returns 200, closing the body and returning an error otherwise. customize
+// may set headers before the request is sent. The caller closes resp.Body.
+func httpGetOK(ctx context.Context, url, desc string, customize func(*http.Request)) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	if customize != nil {
+		customize(req)
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", desc, err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return nil, fmt.Errorf("%s: %s", desc, resp.Status)
+	}
+	return resp, nil
 }

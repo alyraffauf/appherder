@@ -63,13 +63,13 @@ func TestParseUpdateInfoRejectsMalformedGitHub(t *testing.T) {
 	}
 }
 
-func TestMatchAssetIgnoresZsyncAndOthers(t *testing.T) {
+func TestMatchByNameIgnoresZsyncAndOthers(t *testing.T) {
 	assets := []ghAsset{
 		{Name: "MyApp-1.2.3-x86_64.AppImage.zsync"},
 		{Name: "source.tar.gz"},
 		{Name: "MyApp-1.2.3-x86_64.AppImage"},
 	}
-	got, err := matchAsset(assets, "MyApp-*-x86_64.AppImage")
+	got, err := matchByName(assets, "MyApp-*-x86_64.AppImage", func(a ghAsset) string { return a.Name }, "GitHub")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,8 +78,9 @@ func TestMatchAssetIgnoresZsyncAndOthers(t *testing.T) {
 	}
 }
 
-func TestMatchAssetNoMatch(t *testing.T) {
-	if _, err := matchAsset([]ghAsset{{Name: "other.AppImage"}}, "MyApp-*.AppImage"); err == nil {
+func TestMatchByNameNoMatch(t *testing.T) {
+	_, err := matchByName([]ghAsset{{Name: "other.AppImage"}}, "MyApp-*.AppImage", func(a ghAsset) string { return a.Name }, "GitHub")
+	if err == nil {
 		t.Fatal("expected error when nothing matches")
 	}
 }

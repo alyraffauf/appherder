@@ -2,13 +2,9 @@ package appherder
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
-	"path"
-	"sort"
 	"strconv"
 )
 
@@ -51,29 +47,23 @@ func (s gitlabReleaseSource) Latest(ctx context.Context) (Release, error) {
 	ctx, cancel := context.WithTimeout(ctx, apiTimeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	desc := fmt.Sprintf("query GitLab releases for %s", s.project)
+	resp, err := httpGetOK(ctx, endpoint, desc, func(req *http.Request) {
+		if tok := gitlabToken(); tok != "" {
+			req.Header.Set("PRIVATE-TOKEN", tok)
+		}
+	})
 	if err != nil {
 		return Release{}, err
 	}
-	if tok := gitlabToken(); tok != "" {
-		req.Header.Set("PRIVATE-TOKEN", tok)
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return Release{}, fmt.Errorf("query GitLab releases for %s: %w", s.project, err)
-	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return Release{}, fmt.Errorf("query GitLab releases for %s: %s", s.project, resp.Status)
+
+	rel, err := decodeJSON[glRelease](resp.Body, fmt.Sprintf("decode GitLab release for %s", s.project))
+	if err != nil {
+		return Release{}, err
 	}
 
-	var rel glRelease
-	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
-		return Release{}, fmt.Errorf("decode GitLab release for %s: %w", s.project, err)
-	}
-
-	asset, err := matchLink(rel.Assets.Links, s.pattern)
+	asset, err := matchByName(rel.Assets.Links, s.pattern, func(l glLink) string { return l.Name }, "GitLab")
 	if err != nil {
 		return Release{}, err
 	}
@@ -92,22 +82,6 @@ func (s gitlabReleaseSource) Latest(ctx context.Context) (Release, error) {
 		}
 	}
 	return out, nil
-}
-
-// matchLink picks the release asset whose name matches pattern (a glob), taking
-// the first by name when several match, for determinism.
-func matchLink(links []glLink, pattern string) (glLink, error) {
-	var matches []glLink
-	for _, link := range links {
-		if ok, _ := path.Match(pattern, link.Name); ok {
-			matches = append(matches, link)
-		}
-	}
-	if len(matches) == 0 {
-		return glLink{}, fmt.Errorf("no GitLab release asset matches %q", pattern)
-	}
-	sort.Slice(matches, func(i, j int) bool { return matches[i].Name < matches[j].Name })
-	return matches[0], nil
 }
 
 func findLink(links []glLink, name string) (glLink, bool) {
@@ -130,10 +104,5 @@ func linkURL(link glLink) string {
 // gitlabToken returns a token from the environment, used for private projects
 // and to raise rate limits. It is never sent to asset download URLs.
 func gitlabToken() string {
-	for _, key := range []string{"GL_TOKEN", "GITLAB_TOKEN"} {
-		if token := os.Getenv(key); token != "" {
-			return token
-		}
-	}
-	return ""
+	return tokenFromEnv("GL_TOKEN", "GITLAB_TOKEN")
 }

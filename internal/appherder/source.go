@@ -6,9 +6,13 @@ import (
 	"crypto/sha256"
 	"debug/elf"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"hash"
+	"io"
 	"os"
+	"path"
+	"sort"
 	"strings"
 	"time"
 )
@@ -159,4 +163,40 @@ func parseUpdateInfo(info string) (Source, error) {
 	default:
 		return nil, fmt.Errorf("unsupported update source %q", fields[0])
 	}
+}
+
+// tokenFromEnv returns the first non-empty environment variable from keys.
+func tokenFromEnv(keys ...string) string {
+	for _, key := range keys {
+		if token := os.Getenv(key); token != "" {
+			return token
+		}
+	}
+	return ""
+}
+
+// matchByName picks the first item whose name matches pattern (a glob), sorting
+// matches by name for determinism.
+func matchByName[T any](items []T, pattern string, name func(T) string, kind string) (T, error) {
+	var matches []T
+	for _, item := range items {
+		if ok, _ := path.Match(pattern, name(item)); ok {
+			matches = append(matches, item)
+		}
+	}
+	if len(matches) == 0 {
+		var zero T
+		return zero, fmt.Errorf("no %s release asset matches %q", kind, pattern)
+	}
+	sort.Slice(matches, func(i, j int) bool { return name(matches[i]) < name(matches[j]) })
+	return matches[0], nil
+}
+
+// decodeJSON decodes a JSON value from r, wrapping any error with desc.
+func decodeJSON[T any](r io.Reader, desc string) (T, error) {
+	var value T
+	if err := json.NewDecoder(r).Decode(&value); err != nil {
+		return value, fmt.Errorf("%s: %w", desc, err)
+	}
+	return value, nil
 }

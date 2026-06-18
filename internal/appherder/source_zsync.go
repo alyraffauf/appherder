@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -49,18 +48,12 @@ func fetchZsyncHeader(ctx context.Context, zsyncURL string) (map[string]string, 
 	ctx, cancel := context.WithTimeout(ctx, apiTimeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, zsyncURL, nil)
+	desc := fmt.Sprintf("fetch zsync control file %s", zsyncURL)
+	resp, err := httpGetOK(ctx, zsyncURL, desc, nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("fetch zsync control file %s: %w", zsyncURL, err)
-	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fetch zsync control file %s: %s", zsyncURL, resp.Status)
-	}
 
 	header, err := parseZsyncHeader(resp.Body)
 	if err != nil {

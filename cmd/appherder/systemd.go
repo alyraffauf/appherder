@@ -12,6 +12,36 @@ import (
 //go:embed systemd/*
 var unitTemplates embed.FS
 
+var syncUnits = []string{
+	"appherder-sync.path",
+	"appherder-sync.service",
+}
+
+var upgradeUnits = []string{
+	"appherder-upgrade.timer",
+	"appherder-upgrade.service",
+}
+
+func enableUnits(units []string) error {
+	if err := writeUnitFiles(units); err != nil {
+		return err
+	}
+	if err := runSystemctl("daemon-reload"); err != nil {
+		return err
+	}
+	return runSystemctl("enable", "--now", units[0])
+}
+
+func disableUnits(units []string) error {
+	if err := runSystemctl("disable", "--now", units[0]); err != nil {
+		return err
+	}
+	if err := removeUnitFiles(units); err != nil {
+		return err
+	}
+	return runSystemctl("daemon-reload")
+}
+
 func binaryPath() (string, error) {
 	bin, err := os.Executable()
 	if err != nil {

@@ -2,12 +2,8 @@ package appherder
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
-	"path"
-	"sort"
 	"strings"
 )
 
@@ -45,30 +41,24 @@ func (s githubReleaseSource) Latest(ctx context.Context) (Release, error) {
 	ctx, cancel := context.WithTimeout(ctx, apiTimeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	desc := fmt.Sprintf("query GitHub releases for %s/%s", s.owner, s.repo)
+	resp, err := httpGetOK(ctx, endpoint, desc, func(req *http.Request) {
+		req.Header.Set("Accept", "application/vnd.github+json")
+		if tok := githubToken(); tok != "" {
+			req.Header.Set("Authorization", "Bearer "+tok)
+		}
+	})
 	if err != nil {
 		return Release{}, err
 	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	if tok := githubToken(); tok != "" {
-		req.Header.Set("Authorization", "Bearer "+tok)
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return Release{}, fmt.Errorf("query GitHub releases for %s/%s: %w", s.owner, s.repo, err)
-	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return Release{}, fmt.Errorf("query GitHub releases for %s/%s: %s", s.owner, s.repo, resp.Status)
+
+	rel, err := decodeJSON[ghRelease](resp.Body, fmt.Sprintf("decode GitHub release for %s/%s", s.owner, s.repo))
+	if err != nil {
+		return Release{}, err
 	}
 
-	var rel ghRelease
-	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
-		return Release{}, fmt.Errorf("decode GitHub release for %s/%s: %w", s.owner, s.repo, err)
-	}
-
-	asset, err := matchAsset(rel.Assets, s.pattern)
+	asset, err := matchByName(rel.Assets, s.pattern, func(a ghAsset) string { return a.Name }, "GitHub")
 	if err != nil {
 		return Release{}, err
 	}
@@ -80,29 +70,8 @@ func (s githubReleaseSource) Latest(ctx context.Context) (Release, error) {
 	}, nil
 }
 
-// matchAsset picks the release asset whose name matches pattern (a glob). On
-// multiple matches it takes the first by name, for determinism.
-func matchAsset(assets []ghAsset, pattern string) (ghAsset, error) {
-	var matches []ghAsset
-	for _, asset := range assets {
-		if ok, _ := path.Match(pattern, asset.Name); ok {
-			matches = append(matches, asset)
-		}
-	}
-	if len(matches) == 0 {
-		return ghAsset{}, fmt.Errorf("no GitHub release asset matches %q", pattern)
-	}
-	sort.Slice(matches, func(i, j int) bool { return matches[i].Name < matches[j].Name })
-	return matches[0], nil
-}
-
 // githubToken returns a personal access token from the environment, used to
 // raise the API rate limit. It is never sent to asset download URLs.
 func githubToken() string {
-	for _, key := range []string{"GH_TOKEN", "GITHUB_TOKEN"} {
-		if token := os.Getenv(key); token != "" {
-			return token
-		}
-	}
-	return ""
+	return tokenFromEnv("GH_TOKEN", "GITHUB_TOKEN")
 }

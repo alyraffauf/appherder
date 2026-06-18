@@ -86,21 +86,11 @@ func (a App) Install(appimage string) (appName string, err error) {
 
 // InstallFromURL downloads an AppImage from url and installs it.
 func (a App) InstallFromURL(ctx context.Context, url string) (string, error) {
-	tmp, err := os.CreateTemp("", "appherder-install-*.appimage")
+	tmpName, err := downloadToTemp(ctx, url, "appherder-install")
 	if err != nil {
-		return "", fmt.Errorf("create temporary file: %w", err)
-	}
-	tmpName := tmp.Name()
-	defer os.Remove(tmpName)
-
-	if err := download(ctx, url, tmp); err != nil {
-		tmp.Close()
 		return "", err
 	}
-	if err := tmp.Close(); err != nil {
-		return "", fmt.Errorf("close download: %w", err)
-	}
-
+	defer os.Remove(tmpName)
 	return a.Install(tmpName)
 }
 

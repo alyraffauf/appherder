@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -111,20 +110,11 @@ func parallelMap[T, R any](ctx context.Context, items []T, limit int, fn func(co
 }
 
 func (a App) applyUpgrade(ctx context.Context, rel Release) error {
-	tmp, err := os.CreateTemp("", "appherder-upgrade-*.appimage")
+	tmpName, err := downloadToTemp(ctx, rel.URL, "appherder-upgrade")
 	if err != nil {
-		return fmt.Errorf("create temporary file: %w", err)
-	}
-	tmpName := tmp.Name()
-	defer os.Remove(tmpName)
-
-	if err := download(ctx, rel.URL, tmp); err != nil {
-		tmp.Close()
 		return err
 	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("close download: %w", err)
-	}
+	defer os.Remove(tmpName)
 
 	if err := rel.verifyDownload(tmpName); err != nil {
 		return err
@@ -134,22 +124,35 @@ func (a App) applyUpgrade(ctx context.Context, rel Release) error {
 	return err
 }
 
+// downloadToTemp downloads url to a temporary file and returns its path. The
+// caller must remove the file.
+func downloadToTemp(ctx context.Context, url, prefix string) (string, error) {
+	tmp, err := os.CreateTemp("", prefix+"-*.appimage")
+	if err != nil {
+		return "", fmt.Errorf("create temporary file: %w", err)
+	}
+	tmpName := tmp.Name()
+	if err := download(ctx, url, tmp); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return "", err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpName)
+		return "", fmt.Errorf("close download: %w", err)
+	}
+	return tmpName, nil
+}
+
 func download(ctx context.Context, url string, writer io.Writer) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	resp, err := httpGetOK(ctx, url, fmt.Sprintf("download %s", url), nil)
 	if err != nil {
 		return err
 	}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("download %s: %w", url, err)
-	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("download %s: %s", url, resp.Status)
-	}
 	_, err = io.Copy(writer, newIdleTimeoutReader(resp.Body, downloadIdleTimeout, cancel))
 	return err
 }
