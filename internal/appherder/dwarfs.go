@@ -40,7 +40,6 @@ func openDwarFS(appimagePath string) (fs.FS, func(), error) {
 func extractCommand(ctx context.Context, appimagePath, destDir string) *exec.Cmd {
 	extract, err := exec.LookPath("dwarfsextract")
 	if err == nil {
-		// Extract only the desktop entry and icon files.
 		return exec.CommandContext(ctx, extract,
 			"--input="+appimagePath,
 			"--output="+destDir,
@@ -50,6 +49,9 @@ func extractCommand(ctx context.Context, appimagePath, destDir string) *exec.Cmd
 			"--pattern=.DirIcon",
 		)
 	}
+	// Fall back to the AppImage's own --appimage-extract. The file must be
+	// executable for this to work.
+	os.Chmod(appimagePath, 0o755)
 	cmd := exec.CommandContext(ctx, appimagePath, "--appimage-extract")
 	cmd.Dir = destDir
 	return cmd
