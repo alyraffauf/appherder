@@ -56,9 +56,7 @@ func extractCommand(ctx context.Context, appimagePath, destDir string) *exec.Cmd
 }
 
 // isDwarFS reports whether the payload at offset starts with the DwarFS magic.
-func isDwarFS(file interface {
-	ReadAt([]byte, int64) (int, error)
-}, offset int64) bool {
+func isDwarFS(file readerAt, offset int64) bool {
 	magic := make([]byte, 6)
 	_, err := file.ReadAt(magic, offset)
 	return err == nil && string(magic) == "DWARFS"
