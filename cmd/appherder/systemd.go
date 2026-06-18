@@ -43,6 +43,9 @@ func disableUnits(units []string) error {
 }
 
 func binaryPath() (string, error) {
+	if appimage := os.Getenv("APPIMAGE"); appimage != "" {
+		return appimage, nil
+	}
 	bin, err := os.Executable()
 	if err != nil {
 		return "", fmt.Errorf("resolve appherder binary: %w", err)
