@@ -13,6 +13,8 @@ appherder automatically installs, removes, and upgrades your AppImages. Throw th
 - **Real apps, not loose files.** Installed AppImages show up in your application menu with their real name and icon.
 - **Install from anywhere.** Point it at a local file or paste a download link.
 - **Updates without the pile-up.** A newer version replaces the old one.
+- **Verified updates.** Pins the publisher's signing key on first install, then refuses tampered or re-keyed updates.
+- **One-command rollback.** A bad update? Put the old version back instantly.
 - **Stays out of the way.** It only touches launchers it created. Your Flatpaks and hand-made shortcuts are safe.
 
 ## Installation
@@ -36,7 +38,7 @@ Or `nix profile install github:alyraffauf/appherder` to keep it around.
 
 ### Build from source
 
-Requires Go 1.24+.
+Requires Go 1.25+.
 
 ```bash
 git clone https://github.com/alyraffauf/appherder.git
@@ -82,7 +84,22 @@ appherder upgrade              # download and install available updates
 appherder upgrade --check      # just see what's out of date
 ```
 
+Undo a bad update:
+
+```bash
+appherder rollback foo         # restore the version the last update replaced
+appherder rollback foo 1.2.3   # or restore a specific saved version
+```
+
+appherder keeps the last few versions of each app and saves the current one whenever an install or upgrade replaces it.
+
 Coming from another AppImage tool? `appherder migrate` adopts the ones in `~/AppImages` and clears out launchers whose AppImage is gone.
+
+## Verified updates
+
+Some AppImages are signed by their publisher. The first time appherder installs a signed app, it pins that signing key. From then on, every update must be signed by the same key: an unsigned, tampered, or differently-signed build is refused instead of installed. Changing the trusted key is deliberate, so swapping publishers means uninstalling and reinstalling. Apps that aren't signed keep working as before; the pin only takes effect once a real signature has been seen.
+
+`appherder list` shows each app's status in the **SIGNATURE** column: `pinned` (key locked in), `signed` (carries a signature appherder hasn't pinned yet), or `none`.
 
 ## Under the hood
 
