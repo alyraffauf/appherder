@@ -29,6 +29,7 @@ func newRootCommand(a appherder.App, stdout io.Writer, stderr io.Writer) *cobra.
 		newMigrateCommand(a),
 		newUpgradeCommand(a),
 		newAutosyncCommand(),
+		newAutoupgradeCommand(),
 	)
 	return cmd
 }
@@ -187,5 +188,24 @@ func newAutosyncCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&off, "off", false, "Disable and remove the autosync watcher")
+	return cmd
+}
+
+func newAutoupgradeCommand() *cobra.Command {
+	var off bool
+	cmd := &cobra.Command{
+		Use:   "autoupgrade",
+		Short: "Enable or disable daily automatic upgrades",
+		Long: "Installs a systemd user timer that checks for and installs AppImage updates\n" +
+			"once a day. No root required.",
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if off {
+				return disableAutoupgrade()
+			}
+			return enableAutoupgrade()
+		},
+	}
+	cmd.Flags().BoolVar(&off, "off", false, "Disable and remove the upgrade timer")
 	return cmd
 }

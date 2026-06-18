@@ -19,6 +19,7 @@ On its own, an AppImage is just an executable in a folder. No icon, no menu entr
 - **Tells you what it manages.** `appherder list` shows every app it installed, where it checks for updates, and which ones are missing their AppImage.
 - **Quiet when nothing changed.** Re-installing an unchanged app does nothing. Drop your AppImages in one folder and `appherder sync` lines everything up.
 - **Syncs automatically.** `appherder autosync` watches `~/AppImages` and installs or removes apps the moment you add or delete a file.
+- **Upgrades automatically.** `appherder autoupgrade` checks for and installs updates once a day.
 
 ## Installation
 
@@ -58,6 +59,7 @@ appherder uninstall foo                              # remove one
 appherder list                                       # see what's installed
 appherder sync                                       # match your apps to what's in ~/AppImages
 appherder autosync                                   # auto-sync on file changes
+appherder autoupgrade                                 # auto-upgrade once a day
 appherder upgrade --check                            # see what's out of date
 appherder upgrade                                    # download and install updates
 appherder migrate                                    # adopt apps another tool set up

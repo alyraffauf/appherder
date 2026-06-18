@@ -1,0 +1,6 @@
+[Unit]
+Description=Download and install available AppImage updates
+
+[Service]
+Type=oneshot
+ExecStart={{BIN}} upgrade
