@@ -28,6 +28,7 @@ func newRootCommand(a appherder.App, stdout io.Writer, stderr io.Writer) *cobra.
 		newSyncCommand(a),
 		newMigrateCommand(a),
 		newUpgradeCommand(a),
+		newAutosyncCommand(),
 	)
 	return cmd
 }
@@ -167,5 +168,24 @@ func newUpgradeCommand(a appherder.App) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&check, "check", false, "Report available updates without installing them")
+	return cmd
+}
+
+func newAutosyncCommand() *cobra.Command {
+	var off bool
+	cmd := &cobra.Command{
+		Use:   "autosync",
+		Short: "Enable or disable automatic sync when AppImages change",
+		Long: "Installs a systemd user unit that watches ~/AppImages and runs sync whenever a\n" +
+			"file is added or removed. No root required.",
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if off {
+				return disableAutosync()
+			}
+			return enableAutosync()
+		},
+	}
+	cmd.Flags().BoolVar(&off, "off", false, "Disable and remove the autosync watcher")
 	return cmd
 }

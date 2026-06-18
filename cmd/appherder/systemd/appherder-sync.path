@@ -1,0 +1,12 @@
+[Unit]
+Description=Watch ~/AppImages for appherder sync
+
+[Path]
+# PathChanged watches the directory and everything under it via inotify. If
+# ~/AppImages does not yet exist, systemd watches its parent and picks the
+# directory up when it is created.
+PathChanged=%h/AppImages
+Unit=appherder-sync.service
+
+[Install]
+WantedBy=default.target

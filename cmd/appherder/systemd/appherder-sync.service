@@ -1,0 +1,6 @@
+[Unit]
+Description=Reconcile ~/AppImages with installed applications
+
+[Service]
+Type=oneshot
+ExecStart={{BIN}} sync
