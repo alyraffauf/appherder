@@ -97,6 +97,10 @@ func (a App) install(appimage string, want expectedChecksum) (appName string, er
 		return "", err
 	}
 
+	if isTerminalApp(desktop) {
+		_ = a.Link(appName)
+	}
+
 	return appName, nil
 }
 
@@ -144,4 +148,12 @@ func sanitizeAppName(name string) string {
 func appNameFromPath(path string) string {
 	base := filepath.Base(path)
 	return strings.TrimSuffix(base, filepath.Ext(base))
+}
+
+func isTerminalApp(desktop *desktopfile.File) bool {
+	if desktop == nil {
+		return false
+	}
+	val, ok := desktop.Get(desktopEntrySection, "Terminal")
+	return ok && strings.EqualFold(val, "true")
 }
