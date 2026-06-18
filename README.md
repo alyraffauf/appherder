@@ -13,6 +13,7 @@ On its own, an AppImage is just an executable in a folder. No icon, no menu entr
 - **Shows up like a real app.** Lands in your application menu with its real name and icon.
 - **Uninstalls cleanly.** Remove an app and its launcher and icon go with it. No leftovers.
 - **Upgrades replace instead of piling up.** appherder names an app by what's inside it, not the download's filename, so a newer version of `Foo` just replaces the old one.
+- **Checks for updates.** Reads the update info baked into each AppImage and fetches the latest from GitHub, GitLab, zsync, or a static URL. `appherder upgrade --check` shows what's new; `appherder upgrade` downloads and installs it.
 - **Won't touch your other apps.** It only removes launchers it made itself, so your Flatpaks, Snaps, and hand-made shortcuts are safe.
 - **Quiet when nothing changed.** Re-installing an unchanged app does nothing. Drop your AppImages in one folder and `appherder sync` lines everything up.
 
@@ -51,10 +52,14 @@ go build ./cmd/appherder
 appherder install ~/Downloads/Foo-x86_64.AppImage    # install one
 appherder uninstall foo                              # remove one
 appherder sync                                       # match your apps to what's in ~/AppImages
+appherder upgrade --check                            # see what's out of date
+appherder upgrade                                    # download and install updates
 appherder migrate                                    # adopt apps another tool set up
 ```
 
 Installing copies the AppImage into `~/AppImages`, so you can delete the original download. That folder is the source of truth: add or remove files there and `appherder sync` matches your launchers to it. To uninstall, use the name the file has in `~/AppImages` (without `.appimage`).
+
+`appherder upgrade` reads the update info baked into each AppImage and fetches the latest from GitHub, GitLab, zsync, or a static URL. Apps with nothing to check are skipped, downloads are verified when a checksum is available, and apps that are already current are left alone.
 
 Coming from another AppImage tool? `appherder migrate` adopts the ones in `~/AppImages` and clears out launchers whose AppImage is gone, leaving everything else alone.
 
