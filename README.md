@@ -10,10 +10,10 @@ appherder automatically installs, removes, and upgrades your AppImages. Throw th
 ## Features
 
 - **Set it and forget it.** Watches `~/AppImages` and checks for updates in the background.
-- **Real apps, not loose files.** Installed AppImages show up in your application menu with their real name and icon.
+- **Real apps, not loose files.** Installed AppImages show up natively in your application menu.
 - **Install from anywhere.** Point it at a local file or paste a download link.
 - **Updates without the pile-up.** A newer version replaces the old one.
-- **Verified updates.** Pins the publisher's signing key on first install, then refuses tampered or re-keyed updates.
+- **Verified updates.** Pins the publisher's signing key on first install, then refuses tampered updates.
 - **One-command rollback.** A bad update? Put the old version back instantly.
 - **Stays out of the way.** It only touches launchers it created. Your Flatpaks and hand-made shortcuts are safe.
 
