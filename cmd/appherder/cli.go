@@ -27,6 +27,8 @@ func newRootCommand(a appherder.App, stdout io.Writer, stderr io.Writer) *cobra.
 		newInstallCommand(a),
 		newUninstallCommand(a),
 		newListCommand(a),
+		newLinkCommand(a),
+		newUnlinkCommand(a),
 		newSyncCommand(a),
 		newMigrateCommand(a),
 		newUpgradeCommand(a),
@@ -213,6 +215,39 @@ func newAutoCommand(use, short, long, offHelp string, enable, disable func() err
 	}
 	cmd.Flags().BoolVar(&off, "off", false, offHelp)
 	return cmd
+}
+
+func newLinkCommand(a appherder.App) *cobra.Command {
+	return &cobra.Command{
+		Use:   "link APP",
+		Short: "Add an installed AppImage to PATH",
+		Long: "Creates a symlink in ~/.local/bin so the AppImage can be invoked by its name\n" +
+			"from a terminal. The app must already be installed in ~/AppImages.",
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := a.Link(args[0]); err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "linked %s\n", appherder.NormalizeAppName(args[0]))
+			return nil
+		},
+	}
+}
+
+func newUnlinkCommand(a appherder.App) *cobra.Command {
+	return &cobra.Command{
+		Use:   "unlink APP",
+		Short: "Remove an AppImage symlink from PATH",
+		Long:  "Removes the ~/.local/bin symlink created by `appherder link`.",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := a.Unlink(args[0]); err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "unlinked %s\n", appherder.NormalizeAppName(args[0]))
+			return nil
+		},
+	}
 }
 
 func newAutosyncCommand() *cobra.Command {
