@@ -5,8 +5,8 @@ on:
   pull_request:
 
 jobs:
-  test:
-    name: Test
+  build:
+    name: Build & test
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
