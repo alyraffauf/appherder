@@ -20,25 +20,9 @@ type zsyncURLSource struct {
 }
 
 func (s zsyncURLSource) latest(ctx context.Context) (release, error) {
-	ctx, cancel := context.WithTimeout(ctx, apiTimeout)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.url, nil)
+	header, err := fetchZsyncHeader(ctx, s.url)
 	if err != nil {
 		return release{}, err
-	}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return release{}, fmt.Errorf("fetch zsync control file %s: %w", s.url, err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return release{}, fmt.Errorf("fetch zsync control file %s: %s", s.url, resp.Status)
-	}
-
-	header, err := parseZsyncHeader(resp.Body)
-	if err != nil {
-		return release{}, fmt.Errorf("parse zsync control file %s: %w", s.url, err)
 	}
 
 	target, err := resolveZsyncURL(s.url, header["url"])
@@ -55,6 +39,32 @@ func (s zsyncURLSource) latest(ctx context.Context) (release, error) {
 		rel.size = n
 	}
 	return rel, nil
+}
+
+// fetchZsyncHeader downloads a .zsync control file and returns its parsed
+// header. Reused wherever a checksum can be read from a sibling .zsync asset.
+func fetchZsyncHeader(ctx context.Context, zsyncURL string) (map[string]string, error) {
+	ctx, cancel := context.WithTimeout(ctx, apiTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, zsyncURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetch zsync control file %s: %w", zsyncURL, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("fetch zsync control file %s: %s", zsyncURL, resp.Status)
+	}
+
+	header, err := parseZsyncHeader(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("parse zsync control file %s: %w", zsyncURL, err)
+	}
+	return header, nil
 }
 
 // parseZsyncHeader reads a .zsync file's text header: "Key: Value" lines ending

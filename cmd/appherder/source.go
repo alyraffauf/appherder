@@ -125,6 +125,17 @@ func parseUpdateInfo(info string) (source, error) {
 			tag:     fields[3],
 			pattern: strings.TrimSuffix(fields[4], ".zsync"),
 		}, nil
+	case "gl-releases-zsync", "gl-releases-direct":
+		// gl-releases-zsync|host|project|tag|pattern.zsync (our convention)
+		if len(fields) != 5 {
+			return nil, fmt.Errorf("malformed GitLab update info %q", info)
+		}
+		return gitlabReleaseSource{
+			host:    fields[1],
+			project: fields[2],
+			tag:     fields[3],
+			pattern: strings.TrimSuffix(fields[4], ".zsync"),
+		}, nil
 	case "zsync":
 		// zsync|https://host/path/App-latest.AppImage.zsync
 		if len(fields) != 2 || fields[1] == "" {
