@@ -20,13 +20,83 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Build binary
+      - name: Install zsync
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq zsync
+
+      - name: Build AppDir
+        run: |
+          mkdir -p AppDir/usr/bin
+
+          # Binary with tagged version
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+            go build -trimpath \
+            -ldflags "-s -w -X main.version=$GITHUB_REF_NAME" \
+            -o AppDir/usr/bin/appherder ./cmd/appherder
+
+          # AppRun
+          cat > AppDir/AppRun << 'EOF'
+          #!/bin/bash
+          HERE="$(dirname "$(readlink -f "$0")")"
+          exec "$HERE/usr/bin/appherder" "$@"
+          EOF
+
+          # Desktop entry
+          cat > AppDir/appherder.desktop << 'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=AppHerder
+          Comment=A shepherd for your AppImages
+          Exec=appherder
+          Icon=appherder
+          Terminal=true
+          Categories=Utility;
+          X-AppImage-Integrate=false
+          EOF
+
+          # Icon (minimal 256x256 PNG)
+          python3 -c "
+          import struct, zlib
+          def chunk(t, d):
+              c = t + d
+              return struct.pack('>I', len(d)) + c + struct.pack('>I', zlib.crc32(c) & 0xFFFFFFFF)
+          h = b'\x89PNG\r\n\x1a\n'
+          h += chunk(b'IHDR', struct.pack('>IIBBBBB', 256, 256, 8, 2, 0, 0, 0))
+          r = b''
+          for _ in range(256):
+              r += b'\x00'
+              for _ in range(256):
+                  r += bytes([85, 153, 204])
+          h += chunk(b'IDAT', zlib.compress(r))
+          h += chunk(b'IEND', b'')
+          with open('AppDir/appherder.png', 'wb') as f:
+              f.write(h)
+          "
+
+          chmod +x AppDir/AppRun
+
+      - name: Build plain binary
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-            go build -trimpath -ldflags "-s -w" \
+            go build -trimpath \
+            -ldflags "-s -w -X main.version=$GITHUB_REF_NAME" \
             -o appherder-linux-amd64 ./cmd/appherder
+
+      - name: Build AppImage
+        run: |
+          APPIMAGE="appherder-$GITHUB_REF_NAME-x86_64.AppImage"
+          wget -q -O /tmp/appimagetool.AppImage \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x /tmp/appimagetool.AppImage
+          /tmp/appimagetool.AppImage \
+            -u "gh-releases-zsync|alyraffauf|appherder|$GITHUB_REF_NAME|$APPIMAGE.zsync" \
+            AppDir "$APPIMAGE"
 
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" appherder-linux-amd64 --generate-notes
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            appherder-linux-amd64 \
+            appherder-"$GITHUB_REF_NAME"-x86_64.AppImage \
+            appherder-"$GITHUB_REF_NAME"-x86_64.AppImage.zsync \
+            --generate-notes
