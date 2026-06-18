@@ -32,6 +32,7 @@
         default = pkgs.mkShellNoCC {
           packages = with pkgs; [
             go
+            dwarfs
             self.formatter.${system}
           ];
         };

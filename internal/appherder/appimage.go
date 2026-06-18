@@ -14,26 +14,45 @@ import (
 	"github.com/CalebQ42/squashfs"
 )
 
-// openAppImage exposes a type-2 AppImage's squashfs payload as an fs.FS without
-// executing it. The caller must invoke the returned closer to release the file.
+// openAppImage exposes a type-2 AppImage's filesystem as an fs.FS. Supports
+// SquashFS (in-process) and DwarFS (extracted via the runtime). Caller must
+// invoke the returned closer to release resources.
 func openAppImage(path string) (fs.FS, func(), error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("open AppImage %s: %w", path, err)
 	}
 
-	offset, err := appImageSquashfsOffset(file)
+	offset, err := fileSystemOffset(file)
 	if err != nil {
 		file.Close()
 		return nil, nil, fmt.Errorf("read AppImage %s: %w", path, err)
 	}
 
+	if isDwarFS(file, offset) {
+		file.Close()
+		return openDwarFS(path)
+	}
+
+	if isSquashFS(file, offset) {
+		return openSquashFS(file, offset)
+	}
+
+	// Not at the expected offset — try scanning forward.
+	if scanned, ok := scanForSquashFS(file, offset); ok {
+		return openSquashFS(file, scanned)
+	}
+
+	file.Close()
+	return nil, nil, fmt.Errorf("read AppImage %s: unknown or unsupported filesystem", path)
+}
+
+func openSquashFS(file *os.File, offset int64) (fs.FS, func(), error) {
 	reader, err := squashfs.NewReaderAtOffset(file, offset)
 	if err != nil {
 		file.Close()
-		return nil, nil, fmt.Errorf("read AppImage filesystem %s: %w", path, err)
+		return nil, nil, fmt.Errorf("read SquashFS at offset %d: %w", offset, err)
 	}
-
 	return squashFS{root: &reader.FS}, func() { file.Close() }, nil
 }
 
@@ -68,34 +87,68 @@ func (s squashFS) ReadDir(name string) ([]fs.DirEntry, error) { return s.root.Re
 func (s squashFS) Glob(pattern string) ([]string, error)      { return s.root.Glob(pattern) }
 func (s squashFS) Stat(name string) (fs.FileInfo, error)      { return s.root.Stat(name) }
 
-// appImageSquashfsOffset returns the byte offset of the squashfs image appended
-// to the AppImage's ELF runtime, computed from the ELF section header table.
-func appImageSquashfsOffset(reader io.ReaderAt) (int64, error) {
+// fileSystemOffset returns the byte offset where the AppImage's payload
+// filesystem begins, computed from the ELF section header table.
+func fileSystemOffset(file io.ReaderAt) (int64, error) {
 	var header [64]byte
-	if _, err := reader.ReadAt(header[:], 0); err != nil {
+	if _, err := file.ReadAt(header[:], 0); err != nil {
 		return 0, fmt.Errorf("read ELF header: %w", err)
 	}
 	if header[0] != 0x7f || header[1] != 'E' || header[2] != 'L' || header[3] != 'F' {
 		return 0, errors.New("not an AppImage (missing ELF header)")
 	}
-	// AppImages record their type in the otherwise-unused ELF padding bytes.
+
+	// Byte 8-10: AppImage type. 1 = ISO 9660 (unsupported), 2 = appended filesystem.
 	if header[8] == 'A' && header[9] == 'I' && header[10] == 1 {
 		return 0, errors.New("type-1 AppImages are not supported")
 	}
 
-	byteOrder := binary.ByteOrder(binary.LittleEndian)
+	var endian binary.ByteOrder = binary.LittleEndian
 	if header[5] == 2 {
-		byteOrder = binary.BigEndian
+		endian = binary.BigEndian
 	}
-	// The squashfs starts where the ELF ends: e_shoff + e_shnum*e_shentsize.
+
+	// e_shoff + e_shnum * e_shentsize = end of the section header table.
 	switch header[4] {
-	case 1: // 32-bit ELF: e_shoff@32, e_shentsize@46, e_shnum@48
-		return int64(byteOrder.Uint32(header[32:36])) + int64(byteOrder.Uint16(header[46:48]))*int64(byteOrder.Uint16(header[48:50])), nil
-	case 2: // 64-bit ELF: e_shoff@40, e_shentsize@58, e_shnum@60
-		return int64(byteOrder.Uint64(header[40:48])) + int64(byteOrder.Uint16(header[58:60]))*int64(byteOrder.Uint16(header[60:62])), nil
+	case 1: // 32-bit
+		tableStart := int64(endian.Uint32(header[32:36]))
+		entrySize := int64(endian.Uint16(header[46:48]))
+		entryCount := int64(endian.Uint16(header[48:50]))
+		return tableStart + entrySize*entryCount, nil
+	case 2: // 64-bit
+		tableStart := int64(endian.Uint64(header[40:48]))
+		entrySize := int64(endian.Uint16(header[58:60]))
+		entryCount := int64(endian.Uint16(header[60:62]))
+		return tableStart + entrySize*entryCount, nil
 	default:
 		return 0, errors.New("unknown ELF class")
 	}
+}
+
+// isSquashFS reports whether a SquashFS superblock begins at offset.
+func isSquashFS(file interface{ ReadAt([]byte, int64) (int, error) }, offset int64) bool {
+	magic := make([]byte, 4)
+	_, err := file.ReadAt(magic, offset)
+	return err == nil && string(magic) == "hsqs"
+}
+
+// scanForSquashFS searches for a SquashFS superblock in 4096-byte steps over
+// the next 64 MiB starting from offset. Returns the found position or false.
+func scanForSquashFS(file interface{ ReadAt([]byte, int64) (int, error) }, offset int64) (int64, bool) {
+	const window = 64 * 1024 * 1024
+	buf := make([]byte, 4096)
+	for pos := offset; pos < offset+window; pos += 4096 {
+		bytesRead, err := file.ReadAt(buf, pos)
+		if err != nil {
+			return 0, false
+		}
+		for i := range bytesRead - 4 {
+			if buf[i] == 'h' && buf[i+1] == 's' && buf[i+2] == 'q' && buf[i+3] == 's' {
+				return pos + int64(i), true
+			}
+		}
+	}
+	return 0, false
 }
 
 func (a App) installAppImage(file string, appName string) (string, error) {

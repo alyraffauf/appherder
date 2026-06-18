@@ -5,3 +5,4 @@ squashfs-root/
 AppDir/
 /appherder
 /result
+/vendor

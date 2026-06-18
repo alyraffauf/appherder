@@ -20,7 +20,7 @@ func TestAppImageSquashfsOffset(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x38, 0x00, 0x0a, 0x00, 0x40, 0x00,
 		0x1e, 0x00, 0x1d, 0x00,
 	}
-	got, err := appImageSquashfsOffset(bytes.NewReader(header))
+	got, err := fileSystemOffset(bytes.NewReader(header))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +30,7 @@ func TestAppImageSquashfsOffset(t *testing.T) {
 }
 
 func TestAppImageSquashfsOffsetRejectsNonELF(t *testing.T) {
-	if _, err := appImageSquashfsOffset(bytes.NewReader(make([]byte, 64))); err == nil {
+	if _, err := fileSystemOffset(bytes.NewReader(make([]byte, 64))); err == nil {
 		t.Fatal("expected error for non-ELF input")
 	}
 }
@@ -39,7 +39,7 @@ func TestAppImageSquashfsOffsetRejectsType1(t *testing.T) {
 	h := make([]byte, 64)
 	copy(h, []byte{0x7f, 'E', 'L', 'F'})
 	h[8], h[9], h[10] = 'A', 'I', 1
-	if _, err := appImageSquashfsOffset(bytes.NewReader(h)); err == nil {
+	if _, err := fileSystemOffset(bytes.NewReader(h)); err == nil {
 		t.Fatal("expected error for type-1 AppImage")
 	}
 }
