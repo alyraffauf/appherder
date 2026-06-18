@@ -2,17 +2,14 @@
 
 <div align="center">
   <h1>appherder</h1>
-  <h3>A herder for your AppImages.</h3>
-  <p>Install AppImages so they act like real apps instead of loose files in your Downloads.</p>
+  <h3>A shepherd for your AppImages.</h3>
 </div>
 
-On its own, an AppImage is just an executable in a folder. No icon, no menu entry, nothing in your launcher.
-
-appherder fixes that. Point it at an AppImage and you get a real app, kind of like dropping something into Applications on macOS. Delete it later and everything it set up goes too.
+appherder automatically installs, removes, and upgrades your AppImages. Throw them in `~/AppImages` and appherder does the rest: apps appear in your menu, deleted ones disappear from it, and supported apps update in place.
 
 ## Features
 
-- **Set it and forget it.** Manages and upgrades your AppImages for you in the background.
+- **Set it and forget it.** Watches `~/AppImages` and checks for updates in the background.
 - **Real apps, not loose files.** Installed AppImages show up in your application menu with their real name and icon.
 - **Install from anywhere.** Point it at a local file or paste a download link.
 - **Updates without the pile-up.** A newer version replaces the old one.
@@ -49,6 +46,15 @@ go build ./cmd/appherder
 
 ## Usage
 
+Enable automatic sync and upgrades:
+
+```bash
+appherder autosync             # sync whenever ~/AppImages changes
+appherder autoupgrade          # check for updates once a day
+```
+
+Then use `~/AppImages` like the place AppImages belong. Add a file and it gets a launcher. Remove a file and its launcher goes away. When an update is available, appherder installs it without leaving the old copy behind.
+
 Install an app from a file or URL:
 
 ```bash
@@ -74,13 +80,6 @@ Keep things up to date:
 ```bash
 appherder upgrade              # download and install available updates
 appherder upgrade --check      # just see what's out of date
-```
-
-Or let it handle itself:
-
-```bash
-appherder autosync             # sync whenever ~/AppImages changes
-appherder autoupgrade          # check for updates once a day
 ```
 
 Coming from another AppImage tool? `appherder migrate` adopts the ones in `~/AppImages` and clears out launchers whose AppImage is gone.
