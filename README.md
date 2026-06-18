@@ -47,7 +47,7 @@ appherder autosync
 appherder autoupgrade
 ```
 
-The install step copies it into `~/AppImages` and links it to `~/.local/bin/appherder` automatically.
+The install step copies it into `~/AppImages` and links it to `~/.local/bin/appherder` automatically. You may need to restart your terminal or run `export PATH="$HOME/.local/bin:$PATH"` for the command to be found.
 
 ### Nix flake
 
