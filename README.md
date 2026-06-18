@@ -1,4 +1,4 @@
-[![Tests](https://github.com/alyraffauf/appherder/actions/workflows/tests.yml/badge.svg)](https://github.com/alyraffauf/appherder/actions/workflows/tests.yml) [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](http://www.gnu.org/licenses/gpl-3.0) [![Ko-fi](https://img.shields.io/badge/Donate-Ko--fi-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/alyraffauf)
+[![CI](https://github.com/alyraffauf/appherder/actions/workflows/ci.yml/badge.svg)](https://github.com/alyraffauf/appherder/actions/workflows/ci.yml) [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](http://www.gnu.org/licenses/gpl-3.0) [![Ko-fi](https://img.shields.io/badge/Donate-Ko--fi-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/alyraffauf)
 
 <div align="center">
   <h1>appherder</h1>
@@ -20,7 +20,7 @@ On its own, an AppImage is just an executable in a folder. No icon, no menu entr
 
 ### Download a binary
 
-Grab `appherder-linux-amd64` (or `-arm64`) from the [latest release](https://github.com/alyraffauf/appherder/releases/latest), then:
+Grab `appherder-linux-amd64` from the [latest release](https://github.com/alyraffauf/appherder/releases/latest), then:
 
 ```bash
 chmod +x appherder-linux-amd64
