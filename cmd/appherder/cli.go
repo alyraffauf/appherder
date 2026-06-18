@@ -15,7 +15,21 @@ func newRootCommand(a app, stdout io.Writer, stderr io.Writer) *cobra.Command {
 	}
 	cmd.SetOut(stdout)
 	cmd.SetErr(stderr)
-	cmd.AddCommand(newInstallCommand(a), newUninstallCommand(a), newSyncCommand(a), newMigrateCommand(a))
+	cmd.AddCommand(newInstallCommand(a), newUninstallCommand(a), newSyncCommand(a), newMigrateCommand(a), newUpgradeCommand(a))
+	return cmd
+}
+
+func newUpgradeCommand(a app) *cobra.Command {
+	var check bool
+	cmd := &cobra.Command{
+		Use:   "upgrade",
+		Short: "Download and install updates for your AppImages",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return a.upgrade(cmd.Context(), cmd.OutOrStdout(), check)
+		},
+	}
+	cmd.Flags().BoolVar(&check, "check", false, "Report available updates without installing them")
 	return cmd
 }
 
