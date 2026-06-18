@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/alyraffauf/appherder/internal/appherder"
 	"github.com/spf13/cobra"
 )
 
-func newRootCommand(a app, stdout io.Writer, stderr io.Writer) *cobra.Command {
+func newRootCommand(a appherder.App, stdout io.Writer, stderr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "appherder",
 		Short: "A herder for your AppImages",
@@ -19,18 +20,25 @@ func newRootCommand(a app, stdout io.Writer, stderr io.Writer) *cobra.Command {
 	}
 	cmd.SetOut(stdout)
 	cmd.SetErr(stderr)
-	cmd.AddCommand(newInstallCommand(a), newUninstallCommand(a), newListCommand(a), newSyncCommand(a), newMigrateCommand(a), newUpgradeCommand(a))
+	cmd.AddCommand(
+		newInstallCommand(a),
+		newUninstallCommand(a),
+		newListCommand(a),
+		newSyncCommand(a),
+		newMigrateCommand(a),
+		newUpgradeCommand(a),
+	)
 	return cmd
 }
 
-func newInstallCommand(a app) *cobra.Command {
+func newInstallCommand(a appherder.App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "install APPIMAGE",
 		Short: "Install an AppImage",
 		Long:  "Copies an AppImage into ~/AppImages and creates a launcher for it with the app's\nreal name and icon. You can delete the original download afterward.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			name, err := a.install(args[0])
+			name, err := a.Install(args[0])
 			if err != nil {
 				return err
 			}
@@ -40,7 +48,7 @@ func newInstallCommand(a app) *cobra.Command {
 	}
 }
 
-func newUninstallCommand(a app) *cobra.Command {
+func newUninstallCommand(a appherder.App) *cobra.Command {
 	var force bool
 	cmd := &cobra.Command{
 		Use:   "uninstall APP|APPIMAGE",
@@ -48,10 +56,10 @@ func newUninstallCommand(a app) *cobra.Command {
 		Long:  "Removes an AppImage and its launcher and icon. Give the name as it appears in\n~/AppImages (without .appimage), or the full path.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := a.uninstall(args[0], force); err != nil {
+			if err := a.Uninstall(args[0], force); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "removed %s\n", normalizeAppName(args[0]))
+			fmt.Fprintf(cmd.OutOrStdout(), "removed %s\n", appherder.NormalizeAppName(args[0]))
 			return nil
 		},
 	}
@@ -60,19 +68,24 @@ func newUninstallCommand(a app) *cobra.Command {
 	return cmd
 }
 
-func newListCommand(a app) *cobra.Command {
+func newListCommand(a appherder.App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "Show managed AppImages",
 		Long:  "Shows every app appherder is managing: its display name, version, file size,\nand where it checks for updates.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return a.list(cmd.OutOrStdout())
+			infos, err := a.List()
+			if err != nil {
+				return err
+			}
+			printAppList(cmd.OutOrStdout(), infos)
+			return nil
 		},
 	}
 }
 
-func newSyncCommand(a app) *cobra.Command {
+func newSyncCommand(a appherder.App) *cobra.Command {
 	var force bool
 	cmd := &cobra.Command{
 		Use:   "sync",
@@ -82,7 +95,12 @@ func newSyncCommand(a app) *cobra.Command {
 			"~/AppImages.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return a.sync(cmd.Context(), cmd.OutOrStdout(), force)
+			result, err := a.Sync(cmd.Context(), force)
+			if err != nil {
+				return err
+			}
+			printSyncResult(cmd.OutOrStdout(), result)
+			return nil
 		},
 	}
 	cmd.Flags().BoolVarP(&force, "force", "f", false,
@@ -90,7 +108,7 @@ func newSyncCommand(a app) *cobra.Command {
 	return cmd
 }
 
-func newMigrateCommand(a app) *cobra.Command {
+func newMigrateCommand(a appherder.App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "migrate",
 		Short: "Adopt apps from another tool",
@@ -98,12 +116,17 @@ func newMigrateCommand(a app) *cobra.Command {
 			"whose AppImage is missing. Safe to run anytime.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return a.sync(cmd.Context(), cmd.OutOrStdout(), true)
+			result, err := a.Sync(cmd.Context(), true)
+			if err != nil {
+				return err
+			}
+			printSyncResult(cmd.OutOrStdout(), result)
+			return nil
 		},
 	}
 }
 
-func newUpgradeCommand(a app) *cobra.Command {
+func newUpgradeCommand(a appherder.App) *cobra.Command {
 	var check bool
 	cmd := &cobra.Command{
 		Use:   "upgrade",
@@ -113,7 +136,18 @@ func newUpgradeCommand(a app) *cobra.Command {
 			"Apps with no update info or already current are skipped silently.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return a.upgrade(cmd.Context(), cmd.OutOrStdout(), check)
+			out := cmd.OutOrStdout()
+			checks, err := a.CheckUpgrades(cmd.Context())
+			if err != nil {
+				return err
+			}
+			if check {
+				printUpgradeChecks(out, checks)
+				return nil
+			}
+			applied := a.ApplyUpgrades(cmd.Context(), checks)
+			printUpgradeApplied(out, checks, applied)
+			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&check, "check", false, "Report available updates without installing them")
