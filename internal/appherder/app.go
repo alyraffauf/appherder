@@ -15,6 +15,7 @@ type App struct {
 	applicationsDir string
 	iconsDir        string
 	binDir          string
+	progress        Progress
 }
 
 // NewApp returns an App wired to the current user's home directory. The
@@ -42,4 +43,10 @@ func NewAppWithDirs(appimagesDir, applicationsDir, iconsDir, binDir string) App 
 		iconsDir:        iconsDir,
 		binDir:          binDir,
 	}
+}
+
+// WithProgress returns a copy of App that reports download progress to p.
+func (a App) WithProgress(p Progress) App {
+	a.progress = p
+	return a
 }

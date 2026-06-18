@@ -53,7 +53,7 @@ func (a App) ApplyUpgrades(ctx context.Context, checks []UpgradeCheck) []Upgrade
 		if check.Err != nil || check.NoSource || !check.Available {
 			continue
 		}
-		err := a.applyUpgrade(ctx, check.Release)
+		err := a.applyUpgrade(ctx, check.Name, check.Release)
 		applied = append(applied, UpgradeApplied{
 			Name:    check.Name,
 			Version: check.Release.Version,
@@ -109,8 +109,8 @@ func parallelMap[T, R any](ctx context.Context, items []T, limit int, fn func(co
 	return results
 }
 
-func (a App) applyUpgrade(ctx context.Context, rel Release) error {
-	tmpName, err := downloadToTemp(ctx, rel.URL, "appherder-upgrade")
+func (a App) applyUpgrade(ctx context.Context, name string, rel Release) error {
+	tmpName, err := downloadToTemp(ctx, rel.URL, "appherder-upgrade", a.progress, name)
 	if err != nil {
 		return err
 	}
@@ -122,13 +122,13 @@ func (a App) applyUpgrade(ctx context.Context, rel Release) error {
 
 // downloadToTemp downloads url to a temporary file and returns its path. The
 // caller must remove the file.
-func downloadToTemp(ctx context.Context, url, prefix string) (string, error) {
+func downloadToTemp(ctx context.Context, url, prefix string, progress Progress, name string) (string, error) {
 	tmp, err := os.CreateTemp("", prefix+"-*.appimage")
 	if err != nil {
 		return "", fmt.Errorf("create temporary file: %w", err)
 	}
 	tmpName := tmp.Name()
-	if err := download(ctx, url, tmp); err != nil {
+	if err := download(ctx, url, tmp, progress, name); err != nil {
 		tmp.Close()
 		os.Remove(tmpName)
 		return "", err
@@ -140,7 +140,7 @@ func downloadToTemp(ctx context.Context, url, prefix string) (string, error) {
 	return tmpName, nil
 }
 
-func download(ctx context.Context, url string, writer io.Writer) error {
+func download(ctx context.Context, url string, writer io.Writer, progress Progress, name string) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -149,6 +149,9 @@ func download(ctx context.Context, url string, writer io.Writer) error {
 		return err
 	}
 	defer resp.Body.Close()
-	_, err = io.Copy(writer, newIdleTimeoutReader(resp.Body, downloadIdleTimeout, cancel))
+
+	body := io.Reader(newIdleTimeoutReader(resp.Body, downloadIdleTimeout, cancel))
+	body = newProgressReader(body, progress, name, resp.ContentLength)
+	_, err = io.Copy(writer, body)
 	return err
 }

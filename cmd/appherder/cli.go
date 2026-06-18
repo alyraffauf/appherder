@@ -52,8 +52,9 @@ func newInstallCommand(a appherder.App) *cobra.Command {
 			var name string
 			var err error
 			if isURL(arg) {
-				fmt.Fprintf(cmd.OutOrStdout(), "downloading %s...\n", arg)
-				name, err = a.InstallFromURL(cmd.Context(), arg)
+				progress := newCliProgress(cmd.ErrOrStderr())
+				name, err = a.WithProgress(progress).InstallFromURL(cmd.Context(), arg)
+				progress.Done()
 			} else {
 				name, err = a.Install(arg)
 			}
@@ -168,7 +169,9 @@ func newUpgradeCommand(a appherder.App) *cobra.Command {
 				printUpgradeChecks(out, checks)
 				return nil
 			}
-			applied := a.ApplyUpgrades(cmd.Context(), checks)
+			progress := newCliProgress(cmd.ErrOrStderr())
+			applied := a.WithProgress(progress).ApplyUpgrades(cmd.Context(), checks)
+			progress.Done()
 			printUpgradeApplied(out, checks, applied)
 			return nil
 		},

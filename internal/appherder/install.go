@@ -106,7 +106,7 @@ func (a App) install(appimage string, want expectedChecksum) (appName string, er
 
 // InstallFromURL downloads an AppImage from url and installs it.
 func (a App) InstallFromURL(ctx context.Context, url string) (string, error) {
-	tmpName, err := downloadToTemp(ctx, url, "appherder-install")
+	tmpName, err := downloadToTemp(ctx, url, "appherder-install", a.progress, url)
 	if err != nil {
 		return "", err
 	}
