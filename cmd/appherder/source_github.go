@@ -82,9 +82,9 @@ func (s githubReleaseSource) latest(ctx context.Context) (release, error) {
 // multiple matches it takes the first by name, for determinism.
 func matchAsset(assets []ghAsset, pattern string) (ghAsset, error) {
 	var matches []ghAsset
-	for _, a := range assets {
-		if ok, _ := path.Match(pattern, a.Name); ok {
-			matches = append(matches, a)
+	for _, asset := range assets {
+		if ok, _ := path.Match(pattern, asset.Name); ok {
+			matches = append(matches, asset)
 		}
 	}
 	if len(matches) == 0 {
@@ -98,8 +98,8 @@ func matchAsset(assets []ghAsset, pattern string) (ghAsset, error) {
 // raise the API rate limit. It is never sent to asset download URLs.
 func githubToken() string {
 	for _, key := range []string{"GH_TOKEN", "GITHUB_TOKEN"} {
-		if v := os.Getenv(key); v != "" {
-			return v
+		if token := os.Getenv(key); token != "" {
+			return token
 		}
 	}
 	return ""

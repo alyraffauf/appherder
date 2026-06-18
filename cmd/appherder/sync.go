@@ -40,9 +40,9 @@ func (a app) sync(ctx context.Context, out io.Writer, force bool) error {
 	results := parallelMap(ctx, files, installConcurrency, func(_ context.Context, f string) syncResult {
 		return syncResult{file: f, err: a.install(f)}
 	})
-	for _, r := range results {
-		if r.err != nil {
-			fmt.Fprintf(out, "skip %s: %v\n", filepath.Base(r.file), r.err)
+	for _, result := range results {
+		if result.err != nil {
+			fmt.Fprintf(out, "skip %s: %v\n", filepath.Base(result.file), result.err)
 		}
 	}
 
@@ -85,14 +85,14 @@ func listAppImages(dir string) ([]string, error) {
 		return nil, err
 	}
 	var files []string
-	for _, e := range entries {
-		if e.IsDir() || strings.HasPrefix(e.Name(), ".") {
+	for _, entry := range entries {
+		if entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
-		if !strings.EqualFold(filepath.Ext(e.Name()), ".appimage") {
+		if !strings.EqualFold(filepath.Ext(entry.Name()), ".appimage") {
 			continue
 		}
-		files = append(files, filepath.Join(dir, e.Name()))
+		files = append(files, filepath.Join(dir, entry.Name()))
 	}
 	sort.Strings(files)
 	return files, nil
@@ -108,11 +108,11 @@ func appImagePresent(dir, appid string) (bool, error) {
 		}
 		return false, err
 	}
-	for _, e := range entries {
-		if e.IsDir() {
+	for _, entry := range entries {
+		if entry.IsDir() {
 			continue
 		}
-		if strings.EqualFold(e.Name(), appid+".appimage") {
+		if strings.EqualFold(entry.Name(), appid+".appimage") {
 			return true, nil
 		}
 	}
@@ -135,7 +135,7 @@ func appImageBackedOrphans(home, appimagesDir string) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("read desktop file %s: %w", path, err)
 		}
-		if v, ok := desktop.get(desktopOwnerKey, desktopEntrySection); ok && v == "true" {
+		if value, ok := desktop.get(desktopOwnerKey, desktopEntrySection); ok && value == "true" {
 			continue
 		}
 		target := desktopTarget(desktop)

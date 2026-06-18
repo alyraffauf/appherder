@@ -216,11 +216,11 @@ func TestSyncReportsSkipsInInputOrder(t *testing.T) {
 	got := out.String()
 	want := []string{"alpha.appimage", "bravo.appimage", "charlie.appimage"}
 	pos := 0
-	for _, w := range want {
-		i := strings.Index(got[pos:], w)
-		if i < 0 {
-			t.Fatalf("output missing %s in order:\n%s", w, got)
+	for _, wantName := range want {
+		idx := strings.Index(got[pos:], wantName)
+		if idx < 0 {
+			t.Fatalf("output missing %s in order:\n%s", wantName, got)
 		}
-		pos += i + len(w)
+		pos += idx + len(wantName)
 	}
 }

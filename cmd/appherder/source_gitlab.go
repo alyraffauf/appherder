@@ -79,14 +79,14 @@ func (s gitlabReleaseSource) latest(ctx context.Context) (release, error) {
 
 	// No digest from the API: take the checksum from the sibling .zsync asset
 	// when present, else comparison falls back to size.
-	if z, ok := findLink(rel.Assets.Links, asset.Name+".zsync"); ok {
-		header, err := fetchZsyncHeader(ctx, linkURL(z))
+	if zsyncLink, ok := findLink(rel.Assets.Links, asset.Name+".zsync"); ok {
+		header, err := fetchZsyncHeader(ctx, linkURL(zsyncLink))
 		if err != nil {
 			return release{}, err
 		}
 		out.sha1 = header["sha-1"]
-		if n, err := strconv.ParseInt(header["length"], 10, 64); err == nil {
-			out.size = n
+		if size, err := strconv.ParseInt(header["length"], 10, 64); err == nil {
+			out.size = size
 		}
 	}
 	return out, nil
@@ -96,9 +96,9 @@ func (s gitlabReleaseSource) latest(ctx context.Context) (release, error) {
 // the first by name when several match, for determinism.
 func matchLink(links []glLink, pattern string) (glLink, error) {
 	var matches []glLink
-	for _, l := range links {
-		if ok, _ := path.Match(pattern, l.Name); ok {
-			matches = append(matches, l)
+	for _, link := range links {
+		if ok, _ := path.Match(pattern, link.Name); ok {
+			matches = append(matches, link)
 		}
 	}
 	if len(matches) == 0 {
@@ -109,28 +109,28 @@ func matchLink(links []glLink, pattern string) (glLink, error) {
 }
 
 func findLink(links []glLink, name string) (glLink, bool) {
-	for _, l := range links {
-		if l.Name == name {
-			return l, true
+	for _, link := range links {
+		if link.Name == name {
+			return link, true
 		}
 	}
 	return glLink{}, false
 }
 
 // linkURL prefers the permalinked direct_asset_url, falling back to the raw url.
-func linkURL(l glLink) string {
-	if l.DirectAssetURL != "" {
-		return l.DirectAssetURL
+func linkURL(link glLink) string {
+	if link.DirectAssetURL != "" {
+		return link.DirectAssetURL
 	}
-	return l.URL
+	return link.URL
 }
 
 // gitlabToken returns a token from the environment, used for private projects
 // and to raise rate limits. It is never sent to asset download URLs.
 func gitlabToken() string {
 	for _, key := range []string{"GL_TOKEN", "GITLAB_TOKEN"} {
-		if v := os.Getenv(key); v != "" {
-			return v
+		if token := os.Getenv(key); token != "" {
+			return token
 		}
 	}
 	return ""

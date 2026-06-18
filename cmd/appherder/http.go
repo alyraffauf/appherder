@@ -36,20 +36,20 @@ const (
 // idleTimeoutReader cancels via cancel() when a single Read stalls longer than
 // timeout, guarding a download against a connection that goes quiet.
 type idleTimeoutReader struct {
-	r       io.Reader
+	reader  io.Reader
 	timer   *time.Timer
 	timeout time.Duration
 }
 
-func newIdleTimeoutReader(r io.Reader, timeout time.Duration, cancel context.CancelFunc) *idleTimeoutReader {
+func newIdleTimeoutReader(reader io.Reader, timeout time.Duration, cancel context.CancelFunc) *idleTimeoutReader {
 	timer := time.AfterFunc(timeout, cancel)
 	timer.Stop()
-	return &idleTimeoutReader{r: r, timer: timer, timeout: timeout}
+	return &idleTimeoutReader{reader: reader, timer: timer, timeout: timeout}
 }
 
-func (t *idleTimeoutReader) Read(p []byte) (int, error) {
+func (t *idleTimeoutReader) Read(buf []byte) (int, error) {
 	t.timer.Reset(t.timeout)
-	n, err := t.r.Read(p)
+	n, err := t.reader.Read(buf)
 	t.timer.Stop()
 	return n, err
 }

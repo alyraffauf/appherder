@@ -21,8 +21,8 @@ func (a app) install(appimage string) (err error) {
 
 	// The squashfs reader parses untrusted input; turn any panic into an error.
 	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("read AppImage %s: %v", appimage, r)
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("read AppImage %s: %v", appimage, recovered)
 		}
 	}()
 
@@ -96,17 +96,17 @@ func deriveAppName(desktop *desktopFile, desktopName string, appimagePath string
 // sanitizeAppName lowercases s, turns spaces into underscores, and drops any
 // character that isn't alphanumeric, underscore, or dot — GearLever's naming
 // rule.
-func sanitizeAppName(s string) string {
-	s = strings.ToLower(s)
-	s = strings.ReplaceAll(s, " ", "_")
-	var b strings.Builder
-	b.Grow(len(s))
-	for _, r := range s {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' || r == '.' {
-			b.WriteRune(r)
+func sanitizeAppName(name string) string {
+	name = strings.ToLower(name)
+	name = strings.ReplaceAll(name, " ", "_")
+	var builder strings.Builder
+	builder.Grow(len(name))
+	for _, char := range name {
+		if (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') || char == '_' || char == '.' {
+			builder.WriteRune(char)
 		}
 	}
-	return b.String()
+	return builder.String()
 }
 
 func appNameFromPath(path string) string {

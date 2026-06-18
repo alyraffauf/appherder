@@ -44,26 +44,26 @@ func (a app) upgrade(ctx context.Context, out io.Writer, checkOnly bool) error {
 
 	// Apply sequentially: bandwidth/disk-bound, and keeps output ordered.
 	available := 0
-	for _, c := range checks {
+	for _, check := range checks {
 		switch {
-		case c.err != nil:
-			fmt.Fprintf(out, "skip %s: %v\n", c.name, c.err)
+		case check.err != nil:
+			fmt.Fprintf(out, "skip %s: %v\n", check.name, check.err)
 			continue
-		case c.noSource || !c.available:
+		case check.noSource || !check.available:
 			continue
 		}
 
 		available++
 		if checkOnly {
-			fmt.Fprintf(out, "%s: update available (%s)\n", c.name, c.release.version)
+			fmt.Fprintf(out, "%s: update available (%s)\n", check.name, check.release.version)
 			continue
 		}
 
-		if err := a.applyUpgrade(ctx, c.release); err != nil {
-			fmt.Fprintf(out, "skip %s: %v\n", c.name, err)
+		if err := a.applyUpgrade(ctx, check.release); err != nil {
+			fmt.Fprintf(out, "skip %s: %v\n", check.name, err)
 			continue
 		}
-		fmt.Fprintf(out, "upgraded %s to %s\n", c.name, c.release.version)
+		fmt.Fprintf(out, "upgraded %s to %s\n", check.name, check.release.version)
 	}
 
 	if available == 0 {
@@ -141,7 +141,7 @@ func (a app) applyUpgrade(ctx context.Context, rel release) error {
 	return a.install(tmpName)
 }
 
-func download(ctx context.Context, url string, w io.Writer) error {
+func download(ctx context.Context, url string, writer io.Writer) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -157,6 +157,6 @@ func download(ctx context.Context, url string, w io.Writer) error {
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download %s: %s", url, resp.Status)
 	}
-	_, err = io.Copy(w, newIdleTimeoutReader(resp.Body, downloadIdleTimeout, cancel))
+	_, err = io.Copy(writer, newIdleTimeoutReader(resp.Body, downloadIdleTimeout, cancel))
 	return err
 }

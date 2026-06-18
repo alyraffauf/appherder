@@ -27,27 +27,27 @@ func bestRootIcon(fsys fs.FS) string {
 	if err != nil {
 		return ""
 	}
-	var p iconPicker
+	var picker iconPicker
 	for _, entry := range entries {
 		if !entry.IsDir() {
-			p.consider(entry.Name(), entry)
+			picker.consider(entry.Name(), entry)
 		}
 	}
-	return p.best
+	return picker.best
 }
 
 func bestThemedIcon(fsys fs.FS) string {
-	var p iconPicker
+	var picker iconPicker
 	for _, dir := range []string{"usr/share/icons", "usr/share/pixmaps"} {
 		_ = fs.WalkDir(fsys, dir, func(name string, entry fs.DirEntry, err error) error {
 			if err != nil || entry.IsDir() {
 				return nil
 			}
-			p.consider(name, entry)
+			picker.consider(name, entry)
 			return nil
 		})
 	}
-	return p.best
+	return picker.best
 }
 
 // iconPicker keeps the best icon seen, preferring format rank then larger size.

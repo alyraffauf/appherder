@@ -64,15 +64,15 @@ func execPath(cmd string) string {
 	if err != nil {
 		return ""
 	}
-	i := 0
-	if i < len(tokens) && tokens[i] == "env" {
-		i++
+	idx := 0
+	if idx < len(tokens) && tokens[idx] == "env" {
+		idx++
 	}
-	for i < len(tokens) && isEnvVar(tokens[i]) {
-		i++
+	for idx < len(tokens) && isEnvVar(tokens[idx]) {
+		idx++
 	}
-	if i < len(tokens) {
-		return tokens[i]
+	if idx < len(tokens) {
+		return tokens[idx]
 	}
 	return ""
 }

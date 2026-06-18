@@ -56,31 +56,31 @@ func writeAtomic(path string, perm os.FileMode, write func(io.Writer) error) (er
 
 // sameContent reports whether a and b are byte-identical, comparing size first
 // to avoid hashing files that obviously differ. A missing b reports false.
-func sameContent(a, b string) (bool, error) {
-	ia, err := os.Stat(a)
+func sameContent(pathA, pathB string) (bool, error) {
+	infoA, err := os.Stat(pathA)
 	if err != nil {
 		return false, err
 	}
-	ib, err := os.Stat(b)
+	infoB, err := os.Stat(pathB)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return false, nil
 		}
 		return false, err
 	}
-	if ia.Size() != ib.Size() {
+	if infoA.Size() != infoB.Size() {
 		return false, nil
 	}
 
-	ha, err := fileHash(a)
+	hashA, err := fileHash(pathA)
 	if err != nil {
 		return false, err
 	}
-	hb, err := fileHash(b)
+	hashB, err := fileHash(pathB)
 	if err != nil {
 		return false, err
 	}
-	return bytes.Equal(ha, hb), nil
+	return bytes.Equal(hashA, hashB), nil
 }
 
 func fileHash(path string) ([]byte, error) {
@@ -88,17 +88,17 @@ func fileHash(path string) ([]byte, error) {
 }
 
 // fileSum returns h's checksum over the file's contents.
-func fileSum(path string, h hash.Hash) ([]byte, error) {
-	f, err := os.Open(path)
+func fileSum(path string, hasher hash.Hash) ([]byte, error) {
+	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer file.Close()
 
-	if _, err := io.Copy(h, f); err != nil {
+	if _, err := io.Copy(hasher, file); err != nil {
 		return nil, err
 	}
-	return h.Sum(nil), nil
+	return hasher.Sum(nil), nil
 }
 
 func copyFromFS(fsys fs.FS, name string, dest string) error {

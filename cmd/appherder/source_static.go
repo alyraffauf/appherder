@@ -25,14 +25,14 @@ func (s staticURLSource) latest(ctx context.Context) (release, error) {
 	defer resp.Body.Close()
 
 	rel := release{url: s.url, version: "latest"}
-	if lm := resp.Header.Get("Last-Modified"); lm != "" {
-		rel.version = lm
-		if t, err := http.ParseTime(lm); err == nil {
-			rel.modTime = t
+	if lastModified := resp.Header.Get("Last-Modified"); lastModified != "" {
+		rel.version = lastModified
+		if modTime, err := http.ParseTime(lastModified); err == nil {
+			rel.modTime = modTime
 		}
 	}
-	if n, err := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64); err == nil {
-		rel.size = n
+	if size, err := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64); err == nil {
+		rel.size = size
 	}
 	return rel, nil
 }

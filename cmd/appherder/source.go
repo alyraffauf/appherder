@@ -25,7 +25,7 @@ type release struct {
 
 // checksum returns the strongest hash the release carries with a hasher to
 // match; ok is false when the source provided no cryptographic hash.
-func (r release) checksum() (want string, h hash.Hash, ok bool) {
+func (r release) checksum() (want string, hasher hash.Hash, ok bool) {
 	switch {
 	case r.sha256 != "":
 		return r.sha256, sha256.New(), true
@@ -38,8 +38,8 @@ func (r release) checksum() (want string, h hash.Hash, ok bool) {
 // localMatches reports whether file already equals this release, by the
 // strongest available signal: checksum, then mtime, then size.
 func (r release) localMatches(file string) (bool, error) {
-	if want, h, ok := r.checksum(); ok {
-		sum, err := fileSum(file, h)
+	if want, hasher, ok := r.checksum(); ok {
+		sum, err := fileSum(file, hasher)
 		if err != nil {
 			return false, err
 		}
@@ -64,11 +64,11 @@ func (r release) localMatches(file string) (bool, error) {
 // verifyDownload checks a freshly downloaded file against the release's
 // checksum. With no checksum there is nothing to verify and it returns nil.
 func (r release) verifyDownload(file string) error {
-	want, h, ok := r.checksum()
+	want, hasher, ok := r.checksum()
 	if !ok {
 		return nil
 	}
-	sum, err := fileSum(file, h)
+	sum, err := fileSum(file, hasher)
 	if err != nil {
 		return err
 	}
@@ -85,20 +85,20 @@ type source interface {
 
 // readUpdateInfo returns the AppImage's embedded update-information string from
 // its .upd_info ELF section, or "" when absent or empty.
-func readUpdateInfo(file string) (string, error) {
-	f, err := elf.Open(file)
+func readUpdateInfo(path string) (string, error) {
+	file, err := elf.Open(path)
 	if err != nil {
-		return "", fmt.Errorf("open AppImage %s: %w", file, err)
+		return "", fmt.Errorf("open AppImage %s: %w", path, err)
 	}
-	defer f.Close()
+	defer file.Close()
 
-	section := f.Section(".upd_info")
+	section := file.Section(".upd_info")
 	if section == nil {
 		return "", nil
 	}
 	data, err := section.Data()
 	if err != nil {
-		return "", fmt.Errorf("read .upd_info from %s: %w", file, err)
+		return "", fmt.Errorf("read .upd_info from %s: %w", path, err)
 	}
 	return strings.TrimRight(string(data), "\x00"), nil
 }

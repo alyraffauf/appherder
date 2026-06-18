@@ -35,8 +35,8 @@ func (s zsyncURLSource) latest(ctx context.Context) (release, error) {
 		sha1:    header["sha-1"],
 		version: zsyncVersion(header),
 	}
-	if n, err := strconv.ParseInt(header["length"], 10, 64); err == nil {
-		rel.size = n
+	if size, err := strconv.ParseInt(header["length"], 10, 64); err == nil {
+		rel.size = size
 	}
 	return rel, nil
 }
@@ -70,9 +70,9 @@ func fetchZsyncHeader(ctx context.Context, zsyncURL string) (map[string]string, 
 // parseZsyncHeader reads a .zsync file's text header: "Key: Value" lines ending
 // at the blank line that separates them from the binary checksum block. Keys
 // are lowercased. It stops at the blank line so the body isn't consumed.
-func parseZsyncHeader(r io.Reader) (map[string]string, error) {
+func parseZsyncHeader(reader io.Reader) (map[string]string, error) {
 	header := make(map[string]string)
-	scanner := bufio.NewScanner(r)
+	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "" { // header ends; binary data follows
@@ -110,11 +110,11 @@ func resolveZsyncURL(zsyncURL, target string) (string, error) {
 // zsyncVersion picks a human label for the build. zsync carries no version, so
 // MTime (which changes per build) is the most useful, then the filename.
 func zsyncVersion(header map[string]string) string {
-	if v := header["mtime"]; v != "" {
-		return v
+	if value := header["mtime"]; value != "" {
+		return value
 	}
-	if v := header["filename"]; v != "" {
-		return v
+	if value := header["filename"]; value != "" {
+		return value
 	}
 	return "latest"
 }
