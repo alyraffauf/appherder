@@ -71,6 +71,15 @@ appherder list
 appherder uninstall foo
 ```
 
+Put an app on your PATH so you can launch it from a terminal:
+
+```bash
+appherder link foo              # creates ~/.local/bin/foo symlink
+appherder unlink foo            # removes it
+```
+
+Uninstall cleans up the symlink automatically.
+
 Installing copies the AppImage into `~/AppImages`. That folder is the source of truth: add or remove files there and `appherder sync` matches your launchers to it.
 
 ```bash
