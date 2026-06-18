@@ -45,5 +45,6 @@ func (a App) installedPaths(appName string) []string {
 		filepath.Join(a.appimagesDir, appName+".appimage"),
 		filepath.Join(a.iconsDir, appName),
 		filepath.Join(a.applicationsDir, appName+".desktop"),
+		a.linkPath(appName),
 	}
 }
