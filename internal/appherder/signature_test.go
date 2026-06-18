@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -139,13 +138,22 @@ func writeAppImage(t *testing.T, data []byte) string {
 	return path
 }
 
-func TestVerifyAppImageSignatureValid(t *testing.T) {
+// noChecksum is the zero value used when a test does not exercise checksums.
+var noChecksum = expectedChecksum{}
+
+// checksumOf returns an expectedChecksum that matches data.
+func checksumOf(data []byte) expectedChecksum {
+	sum := sha256.Sum256(data)
+	return expectedChecksum{hex: hex.EncodeToString(sum[:]), hasher: sha256.New()}
+}
+
+func TestVerifyAppImageValid(t *testing.T) {
 	entity := newTestEntity(t)
 	layout := buildSignableELF(2048, 4096)
 	sig, key := signWith(t, layout, entity)
 	path := writeAppImage(t, layout.embed(sig, key))
 
-	got, err := verifyAppImageSignature(path)
+	got, err := verifyAppImage(path, "", noChecksum)
 	if err != nil {
 		t.Fatalf("verify: %v", err)
 	}
@@ -155,15 +163,14 @@ func TestVerifyAppImageSignatureValid(t *testing.T) {
 	}
 }
 
-func TestVerifyAppImageSignatureUnsigned(t *testing.T) {
-	// Sections present but empty.
+func TestVerifyAppImageUnsigned(t *testing.T) {
 	path := writeAppImage(t, buildSignableELF(2048, 4096).bytes)
-	if _, err := verifyAppImageSignature(path); !errors.Is(err, errUnsigned) {
-		t.Fatalf("err = %v, want errUnsigned", err)
+	if got, err := verifyAppImage(path, "", noChecksum); err != nil || got != "" {
+		t.Fatalf("got (%q, %v), want (\"\", nil)", got, err)
 	}
 }
 
-func TestVerifyAppImageSignatureTampered(t *testing.T) {
+func TestVerifyAppImageTampered(t *testing.T) {
 	entity := newTestEntity(t)
 	layout := buildSignableELF(2048, 4096)
 	sig, key := signWith(t, layout, entity)
@@ -171,23 +178,23 @@ func TestVerifyAppImageSignatureTampered(t *testing.T) {
 	data[layout.textOff] ^= 0xFF // flip a byte outside the signature sections
 
 	path := writeAppImage(t, data)
-	if _, err := verifyAppImageSignature(path); err == nil || errors.Is(err, errUnsigned) {
-		t.Fatalf("err = %v, want invalid-signature error", err)
+	if _, err := verifyAppImage(path, "", noChecksum); err == nil {
+		t.Fatal("expected invalid-signature error")
 	}
 }
 
-func TestVerifyAppImageSignatureMissingKey(t *testing.T) {
+func TestVerifyAppImageMissingKey(t *testing.T) {
 	entity := newTestEntity(t)
 	layout := buildSignableELF(2048, 4096)
 	sig, _ := signWith(t, layout, entity)
 	path := writeAppImage(t, layout.embed(sig, nil)) // signature but no key
 
-	if _, err := verifyAppImageSignature(path); err == nil || errors.Is(err, errUnsigned) {
-		t.Fatalf("err = %v, want missing-key error", err)
+	if _, err := verifyAppImage(path, "", noChecksum); err == nil {
+		t.Fatal("expected missing-key error")
 	}
 }
 
-func TestCheckSignaturePolicy(t *testing.T) {
+func TestVerifyAppImagePolicy(t *testing.T) {
 	entity := newTestEntity(t)
 	layout := buildSignableELF(2048, 4096)
 	sig, key := signWith(t, layout, entity)
@@ -197,40 +204,73 @@ func TestCheckSignaturePolicy(t *testing.T) {
 	unsigned := writeAppImage(t, buildSignableELF(2048, 4096).bytes)
 
 	t.Run("signed with no pin establishes trust", func(t *testing.T) {
-		got, err := checkSignature(signed, "")
-		if err != nil || got != fpr {
+		if got, err := verifyAppImage(signed, "", noChecksum); err != nil || got != fpr {
 			t.Fatalf("got (%q, %v), want (%q, nil)", got, err, fpr)
 		}
 	})
 	t.Run("signed matching pin is accepted", func(t *testing.T) {
-		got, err := checkSignature(signed, fpr)
-		if err != nil || got != fpr {
+		if got, err := verifyAppImage(signed, fpr, noChecksum); err != nil || got != fpr {
 			t.Fatalf("got (%q, %v), want (%q, nil)", got, err, fpr)
 		}
 	})
 	t.Run("signed with different pin is refused", func(t *testing.T) {
-		if _, err := checkSignature(signed, "DEADBEEF"); err == nil {
+		if _, err := verifyAppImage(signed, "DEADBEEF", noChecksum); err == nil {
 			t.Fatal("expected refusal on key change")
 		}
 	})
 	t.Run("unsigned is refused once a key is pinned", func(t *testing.T) {
-		if _, err := checkSignature(unsigned, fpr); err == nil {
+		if _, err := verifyAppImage(unsigned, fpr, noChecksum); err == nil {
 			t.Fatal("expected refusal of unsigned update over a pinned key")
 		}
 	})
 	t.Run("unsigned with no pin stays unpinned", func(t *testing.T) {
-		got, err := checkSignature(unsigned, "")
-		if err != nil || got != "" {
+		if got, err := verifyAppImage(unsigned, "", noChecksum); err != nil || got != "" {
 			t.Fatalf("got (%q, %v), want (\"\", nil)", got, err)
 		}
 	})
 }
 
-// TestVerifyAppImageSignatureGPGInterop proves appherder verifies signatures
-// produced the same way appimagetool produces them (gpg/gpgme: an armored
-// detached signature over the lowercase hex digest). It is skipped where gpg is
+func TestVerifyAppImageChecksum(t *testing.T) {
+	entity := newTestEntity(t)
+	layout := buildSignableELF(2048, 4096)
+	sig, key := signWith(t, layout, entity)
+	signedData := layout.embed(sig, key)
+	unsignedData := buildSignableELF(2048, 4096).bytes
+
+	wrong := func() expectedChecksum {
+		return expectedChecksum{hex: hex.EncodeToString(make([]byte, 32)), hasher: sha256.New()}
+	}
+
+	cases := []struct {
+		name string
+		data []byte
+		want expectedChecksum
+		ok   bool
+	}{
+		{"signed matching", signedData, checksumOf(signedData), true},
+		{"signed mismatched", signedData, wrong(), false},
+		{"unsigned matching", unsignedData, checksumOf(unsignedData), true},
+		{"unsigned mismatched", unsignedData, wrong(), false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			path := writeAppImage(t, tc.data)
+			_, err := verifyAppImage(path, "", tc.want)
+			if tc.ok && err != nil {
+				t.Fatalf("verify: %v", err)
+			}
+			if !tc.ok && err == nil {
+				t.Fatal("expected checksum failure")
+			}
+		})
+	}
+}
+
+// TestVerifyAppImageGPGInterop proves appherder verifies signatures produced
+// the same way appimagetool produces them (gpg/gpgme: an armored detached
+// signature over the lowercase hex digest). It is skipped where gpg is
 // unavailable.
-func TestVerifyAppImageSignatureGPGInterop(t *testing.T) {
+func TestVerifyAppImageGPGInterop(t *testing.T) {
 	gpg, err := exec.LookPath("gpg")
 	if err != nil {
 		t.Skip("gpg not installed")
@@ -274,7 +314,7 @@ func TestVerifyAppImageSignatureGPGInterop(t *testing.T) {
 	}
 
 	path := writeAppImage(t, layout.embed(sig, key))
-	got, err := verifyAppImageSignature(path)
+	got, err := verifyAppImage(path, "", noChecksum)
 	if err != nil {
 		t.Fatalf("verify gpg-signed AppImage: %v", err)
 	}

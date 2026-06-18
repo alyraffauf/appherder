@@ -65,21 +65,14 @@ func (r Release) localMatches(file string) (bool, error) {
 	return false, nil
 }
 
-// verifyDownload checks a freshly downloaded file against the release's
-// checksum. With no checksum there is nothing to verify and it returns nil.
-func (r Release) verifyDownload(file string) error {
+// expectedChecksum returns the source's advertised hash for verifying a
+// download, or the zero value when the source provides none.
+func (r Release) expectedChecksum() expectedChecksum {
 	want, hasher, ok := r.checksum()
 	if !ok {
-		return nil
+		return expectedChecksum{}
 	}
-	sum, err := fileSum(file, hasher)
-	if err != nil {
-		return err
-	}
-	if !strings.EqualFold(hex.EncodeToString(sum), want) {
-		return fmt.Errorf("downloaded AppImage failed checksum verification")
-	}
-	return nil
+	return expectedChecksum{hex: want, hasher: hasher}
 }
 
 // Source resolves the latest available build of an installed app.

@@ -116,11 +116,7 @@ func (a App) applyUpgrade(ctx context.Context, rel Release) error {
 	}
 	defer os.Remove(tmpName)
 
-	if err := rel.verifyDownload(tmpName); err != nil {
-		return err
-	}
-
-	_, err = a.Install(tmpName)
+	_, err = a.install(tmpName, rel.expectedChecksum())
 	return err
 }
 

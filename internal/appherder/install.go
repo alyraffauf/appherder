@@ -10,7 +10,11 @@ import (
 	"github.com/alyraffauf/goxdgdesktop/desktopfile"
 )
 
-func (a App) Install(appimage string) (appName string, err error) {
+func (a App) Install(appimage string) (string, error) {
+	return a.install(appimage, expectedChecksum{})
+}
+
+func (a App) install(appimage string, want expectedChecksum) (appName string, err error) {
 	appimage, err = filepath.Abs(appimage)
 	if err != nil {
 		return "", fmt.Errorf("resolve AppImage path %q: %w", appimage, err)
@@ -37,9 +41,9 @@ func (a App) Install(appimage string) (appName string, err error) {
 	icon := resolveIcon(fsys)
 	appName = deriveAppName(desktop, desktopName, appimage)
 
-	// Enforce the signature trust policy before any filesystem writes, so a
-	// refused AppImage installs nothing.
-	pin, err := checkSignature(appimage, a.pinnedSigningKey(appName))
+	// Verify integrity and signature before any filesystem writes, so a refused
+	// AppImage installs nothing.
+	pin, err := verifyAppImage(appimage, a.pinnedSigningKey(appName), want)
 	if err != nil {
 		return "", err
 	}
@@ -103,7 +107,7 @@ func (a App) InstallFromURL(ctx context.Context, url string) (string, error) {
 		return "", err
 	}
 	defer os.Remove(tmpName)
-	return a.Install(tmpName)
+	return a.install(tmpName, expectedChecksum{})
 }
 
 // deriveAppName picks the canonical install name, matching GearLever so the
