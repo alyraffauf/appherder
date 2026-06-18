@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/kballard/go-shellquote"
+	"github.com/alyraffauf/goxdgdesktop/desktopexec"
 )
 
 func TestPatchExecCommandDropsOriginalEnvWrappedExecutable(t *testing.T) {
@@ -55,7 +55,7 @@ func TestPatchExecCommandKeepsPositionalKeyValueArgument(t *testing.T) {
 func mustSplit(t *testing.T, cmd string) []string {
 	t.Helper()
 
-	tokens, err := shellquote.Split(cmd)
+	tokens, err := desktopexec.Split(cmd)
 	if err != nil {
 		t.Fatalf("split %q: %v", cmd, err)
 	}

@@ -224,7 +224,7 @@ func readAppImageVersion(path string) string {
 	if fsys, closeFs, err := openAppImage(path); err == nil {
 		defer closeFs()
 		if desktop, _, err := findDesktopFile(fsys); err == nil && desktop != nil {
-			if version, ok := desktop.get("X-AppImage-Version", desktopEntrySection); ok && version != "" {
+			if version, ok := desktop.Get(desktopEntrySection, "X-AppImage-Version"); ok && version != "" {
 				return sanitizeVersionForFilename(version)
 			}
 		}

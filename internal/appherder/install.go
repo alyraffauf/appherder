@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/alyraffauf/goxdgdesktop/desktopfile"
 )
 
 func (a App) Install(appimage string) (appName string, err error) {
@@ -38,7 +40,7 @@ func (a App) Install(appimage string) (appName string, err error) {
 	// No desktop file inside the AppImage: synthesize a terminal launcher so
 	// CLI apps still get a menu entry and are tracked by managedApps.
 	if desktop == nil {
-		desktop = parseDesktopFile([]byte(fmt.Sprintf(
+		desktop = desktopfile.Parse([]byte(fmt.Sprintf(
 			"[Desktop Entry]\nType=Application\nName=%s\nTerminal=true\n",
 			appNameFromPath(appimage),
 		)))
@@ -97,9 +99,9 @@ func (a App) InstallFromURL(ctx context.Context, url string) (string, error) {
 // deriveAppName picks the canonical install name, matching GearLever so the
 // two tools land at the same path: the desktop entry's Name field (e.g.
 // "ES-DE" -> "esde"), then the desktop-file id, then the source filename.
-func deriveAppName(desktop *desktopFile, desktopName string, appimagePath string) string {
+func deriveAppName(desktop *desktopfile.File, desktopName string, appimagePath string) string {
 	if desktop != nil {
-		if name, ok := desktop.get("Name", desktopEntrySection); ok && name != "" {
+		if name, ok := desktop.Get(desktopEntrySection, "Name"); ok && name != "" {
 			return sanitizeAppName(name)
 		}
 	}

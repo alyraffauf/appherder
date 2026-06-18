@@ -1,10 +1,11 @@
 package appherder
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 	"testing/fstest"
+
+	"github.com/alyraffauf/goxdgdesktop/desktopfile"
 )
 
 const sampleDesktopFile = `# leading comment
@@ -23,64 +24,21 @@ Name=New Private Window
 Exec=upstream-app --private-window %U
 `
 
-func TestDesktopFileRoundTripMatchesInput(t *testing.T) {
-	dir := t.TempDir()
-	source := filepath.Join(dir, "source.desktop")
-	output := filepath.Join(dir, "output.desktop")
-	if err := os.WriteFile(source, []byte(sampleDesktopFile), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	desktop, err := readDesktopFile(source)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := desktop.write(output); err != nil {
-		t.Fatal(err)
-	}
-
-	got, err := os.ReadFile(output)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(got) != sampleDesktopFile {
-		t.Fatalf("round trip mismatch:\n%s", got)
-	}
-}
-
 func TestPatchDesktopFilePreservesDesktopActions(t *testing.T) {
 	a, home := newTestApp(t)
 
-	dir := t.TempDir()
-	source := filepath.Join(dir, "source.desktop")
-	if err := os.WriteFile(source, []byte(sampleDesktopFile), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	desktop, err := readDesktopFile(source)
-	if err != nil {
-		t.Fatal(err)
-	}
+	desktop := desktopfile.Parse([]byte(sampleDesktopFile))
 	if err := a.patchDesktopFile(desktop, "example", true); err != nil {
 		t.Fatal(err)
 	}
-	output := filepath.Join(dir, "output.desktop")
-	if err := desktop.write(output); err != nil {
-		t.Fatal(err)
-	}
 
-	patched, err := readDesktopFile(output)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assertDesktopValue(t, patched, desktopEntrySection, desktopOwnerKey, "true")
-	assertDesktopValue(t, patched, desktopEntrySection, "Icon", filepath.Join(home, "AppImages", ".icons", "example"))
-	assertDesktopValue(t, patched, desktopEntrySection, "TryExec", filepath.Join(home, "AppImages", "example.appimage"))
-	assertDesktopExec(t, patched, desktopEntrySection, []string{"env", "FOO=bar", "DESKTOPINTEGRATION=1", filepath.Join(home, "AppImages", "example.appimage"), "%U"})
-	assertDesktopExec(t, patched, "Desktop Action new-window", []string{"env", "DESKTOPINTEGRATION=1", filepath.Join(home, "AppImages", "example.appimage"), "--new-window", "%U"})
-	assertDesktopExec(t, patched, "Desktop Action new-private-window", []string{"env", "DESKTOPINTEGRATION=1", filepath.Join(home, "AppImages", "example.appimage"), "--private-window", "%U"})
-	assertDesktopValue(t, patched, "Desktop Action new-private-window", "Name", "New Private Window")
+	assertDesktopValue(t, desktop, desktopEntrySection, desktopOwnerKey, "true")
+	assertDesktopValue(t, desktop, desktopEntrySection, "Icon", filepath.Join(home, "AppImages", ".icons", "example"))
+	assertDesktopValue(t, desktop, desktopEntrySection, "TryExec", filepath.Join(home, "AppImages", "example.appimage"))
+	assertDesktopExec(t, desktop, desktopEntrySection, []string{"env", "FOO=bar", "DESKTOPINTEGRATION=1", filepath.Join(home, "AppImages", "example.appimage"), "%U"})
+	assertDesktopExec(t, desktop, "Desktop Action new-window", []string{"env", "DESKTOPINTEGRATION=1", filepath.Join(home, "AppImages", "example.appimage"), "--new-window", "%U"})
+	assertDesktopExec(t, desktop, "Desktop Action new-private-window", []string{"env", "DESKTOPINTEGRATION=1", filepath.Join(home, "AppImages", "example.appimage"), "--private-window", "%U"})
+	assertDesktopValue(t, desktop, "Desktop Action new-private-window", "Name", "New Private Window")
 }
 
 func TestFindDesktopFileSkipsDefault(t *testing.T) {
@@ -117,14 +75,14 @@ func TestFindDesktopFileReturnsNilWhenOnlyDefault(t *testing.T) {
 func TestDeriveAppName(t *testing.T) {
 	tests := []struct {
 		name         string
-		desktop      *desktopFile
+		desktop      *desktopfile.File
 		desktopName  string
 		appimagePath string
 		want         string
 	}{
-		{"Name with hyphen", parseDesktopFile([]byte("[Desktop Entry]\nName=ES-DE\n")), "org.es_de.frontend.desktop", "", "esde"},
-		{"Name with spaces", parseDesktopFile([]byte("[Desktop Entry]\nName=Visual Studio Code\n")), "code.desktop", "", "visual_studio_code"},
-		{"Name lowercased", parseDesktopFile([]byte("[Desktop Entry]\nName=Krita\n")), "krita.desktop", "", "krita"},
+		{"Name with hyphen", desktopfile.Parse([]byte("[Desktop Entry]\nName=ES-DE\n")), "org.es_de.frontend.desktop", "", "esde"},
+		{"Name with spaces", desktopfile.Parse([]byte("[Desktop Entry]\nName=Visual Studio Code\n")), "code.desktop", "", "visual_studio_code"},
+		{"Name lowercased", desktopfile.Parse([]byte("[Desktop Entry]\nName=Krita\n")), "krita.desktop", "", "krita"},
 		{"desktop id fallback", nil, "org.kde.krita.desktop", "", "org.kde.krita"},
 		{"filename fallback", nil, "", "/dl/Krita-5.2.0-x86_64.AppImage", "krita5.2.0x86_64"},
 	}
@@ -139,7 +97,7 @@ func TestDeriveAppName(t *testing.T) {
 
 func TestPatchDesktopFileSetsExecWhenMissing(t *testing.T) {
 	a, home := newTestApp(t)
-	desktop := parseDesktopFile([]byte(
+	desktop := desktopfile.Parse([]byte(
 		"[Desktop Entry]\nType=Application\nName=Foo\nTerminal=true\n",
 	))
 	if err := a.patchDesktopFile(desktop, "foo", false); err != nil {
@@ -151,10 +109,10 @@ func TestPatchDesktopFileSetsExecWhenMissing(t *testing.T) {
 	assertDesktopValue(t, desktop, desktopEntrySection, desktopOwnerKey, "true")
 }
 
-func assertDesktopValue(t *testing.T, desktop *desktopFile, section string, key string, want string) {
+func assertDesktopValue(t *testing.T, desktop *desktopfile.File, section string, key string, want string) {
 	t.Helper()
 
-	got, ok := desktop.get(key, section)
+	got, ok := desktop.Get(section, key)
 	if !ok {
 		t.Fatalf("missing %s in section %s", key, section)
 	}
@@ -163,10 +121,10 @@ func assertDesktopValue(t *testing.T, desktop *desktopFile, section string, key 
 	}
 }
 
-func assertDesktopExec(t *testing.T, desktop *desktopFile, section string, want []string) {
+func assertDesktopExec(t *testing.T, desktop *desktopfile.File, section string, want []string) {
 	t.Helper()
 
-	execCmd, ok := desktop.get("Exec", section)
+	execCmd, ok := desktop.Get(section, "Exec")
 	if !ok {
 		t.Fatalf("missing Exec in section %s", section)
 	}

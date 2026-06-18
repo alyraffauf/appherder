@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/alyraffauf/goxdgdesktop/desktopfile"
 )
 
 // installConcurrency caps parallel installs: enough to overlap metadata I/O
@@ -159,11 +161,11 @@ func appImageBackedOrphans(applicationsDir, appimagesDir string) ([]string, erro
 	prefix := appimagesDir + string(filepath.Separator)
 	var orphans []string
 	for _, path := range matches {
-		desktop, err := readDesktopFile(path)
+		desktop, err := desktopfile.Read(path)
 		if err != nil {
 			return nil, fmt.Errorf("read desktop file %s: %w", path, err)
 		}
-		if value, ok := desktop.get(desktopOwnerKey, desktopEntrySection); ok && value == "true" {
+		if value, ok := desktop.Get(desktopEntrySection, desktopOwnerKey); ok && value == "true" {
 			continue
 		}
 		target := desktopTarget(desktop)
@@ -182,11 +184,11 @@ func appImageBackedOrphans(applicationsDir, appimagesDir string) ([]string, erro
 
 // desktopTarget returns the executable path a launcher points at, preferring
 // TryExec.
-func desktopTarget(desktop *desktopFile) string {
-	if tryExec, ok := desktop.get("TryExec", desktopEntrySection); ok && tryExec != "" {
+func desktopTarget(desktop *desktopfile.File) string {
+	if tryExec, ok := desktop.Get(desktopEntrySection, "TryExec"); ok && tryExec != "" {
 		return tryExec
 	}
-	if exec, ok := desktop.get("Exec", desktopEntrySection); ok {
+	if exec, ok := desktop.Get(desktopEntrySection, "Exec"); ok {
 		return execPath(exec)
 	}
 	return ""

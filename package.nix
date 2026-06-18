@@ -1,6 +1,5 @@
 {
   buildGoModule,
-  lib,
 }: let
   version = "dev";
 in
@@ -8,7 +7,7 @@ in
     pname = "appherder";
     inherit version;
     src = ./.;
-    vendorHash = "sha256-cnxgWLpc8l/dvJHgj1PkJrSYmsH88pCTISM+pf7Ulg4=";
+    vendorHash = "sha256-hjyL3/01LWN2VTEBMwJmUyTi+tfh4zMVPWiNTkzCWfk=";
     subPackages = ["cmd/appherder"];
     ldflags = ["-X main.version=${version}"];
   }

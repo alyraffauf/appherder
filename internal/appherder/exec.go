@@ -3,11 +3,11 @@ package appherder
 import (
 	"strings"
 
-	"github.com/kballard/go-shellquote"
+	"github.com/alyraffauf/goxdgdesktop/desktopexec"
 )
 
 func patchExecCommand(execCmd string, appimage string) string {
-	tokens, err := shellquote.Split(execCmd)
+	tokens, err := desktopexec.Split(execCmd)
 	if err != nil {
 		return execCmd
 	}
@@ -21,14 +21,14 @@ func patchExecCommand(execCmd string, appimage string) string {
 		executableIndex = 1
 	}
 
-	for executableIndex < len(tokens) && isEnvVar(tokens[executableIndex]) {
+	for executableIndex < len(tokens) && desktopexec.IsEnvAssignment(tokens[executableIndex]) {
 		envVars = append(envVars, tokens[executableIndex])
 		executableIndex++
 	}
 
 	args := []string{}
 	for _, token := range tokens[executableIndex+1:] {
-		if isStrippedDesktopExecCode(token) {
+		if desktopexec.IsMetadataFieldCode(token) {
 			continue
 		}
 		args = append(args, token)
@@ -50,33 +50,10 @@ func patchExecCommand(execCmd string, appimage string) string {
 		cmd = append([]string{"env"}, append(envVars, cmd...)...)
 	}
 
-	return shellquote.Join(cmd...)
+	return desktopexec.Join(cmd...)
 }
 
-func isEnvVar(token string) bool {
-	return strings.Contains(token, "=") && !strings.HasPrefix(token, "/") && !strings.HasPrefix(token, "-")
-}
-
-// execPath returns the executable path from a desktop Exec/TryExec command,
-// skipping a leading env and KEY=VALUE assignments.
+// execPath returns the executable from a desktop Exec/TryExec line.
 func execPath(cmd string) string {
-	tokens, err := shellquote.Split(cmd)
-	if err != nil {
-		return ""
-	}
-	idx := 0
-	if idx < len(tokens) && tokens[idx] == "env" {
-		idx++
-	}
-	for idx < len(tokens) && isEnvVar(tokens[idx]) {
-		idx++
-	}
-	if idx < len(tokens) {
-		return tokens[idx]
-	}
-	return ""
-}
-
-func isStrippedDesktopExecCode(token string) bool {
-	return token == "%i" || token == "%c" || token == "%k"
+	return desktopexec.ExecutablePath(cmd)
 }

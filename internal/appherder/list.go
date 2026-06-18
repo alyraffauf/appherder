@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+
+	"github.com/alyraffauf/goxdgdesktop/desktopfile"
 )
 
 // AppInfo is one managed app's display metadata, as returned by List.
@@ -37,11 +39,11 @@ func (a App) List() ([]AppInfo, error) {
 func gatherAppInfo(appsDir, appimagesDir, appid string) AppInfo {
 	info := AppInfo{AppID: appid, Source: "none"}
 
-	if desktop, err := readDesktopFile(filepath.Join(appsDir, appid+".desktop")); err == nil {
-		if name, ok := desktop.get("Name", desktopEntrySection); ok && name != "" {
+	if desktop, err := desktopfile.Read(filepath.Join(appsDir, appid+".desktop")); err == nil {
+		if name, ok := desktop.Get(desktopEntrySection, "Name"); ok && name != "" {
 			info.Name = name
 		}
-		if version, ok := desktop.get("X-AppImage-Version", desktopEntrySection); ok {
+		if version, ok := desktop.Get(desktopEntrySection, "X-AppImage-Version"); ok {
 			info.Version = version
 		}
 	}
