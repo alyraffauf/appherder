@@ -22,6 +22,7 @@ type mainWindow struct {
 
 	app        appherder.App
 	split      *adw.NavigationSplitView
+	apps       []appherder.AppInfo
 	list       *gtk.ListBox
 	installBtn *gtk.MenuButton
 	menuBtn    *gtk.MenuButton
@@ -59,6 +60,7 @@ func (w *mainWindow) installBreakpoints() {
 	condition := adw.NewBreakpointConditionLength(adw.BreakpointConditionMaxWidth, 600, adw.LengthUnitSp)
 	breakpoint := adw.NewBreakpoint(condition)
 	breakpoint.AddSetterDirect(w.split.Object, "collapsed", glib.NewValue(true))
+	breakpoint.AddSetterDirect(w.split.Object, "show-content", glib.NewValue(false))
 	w.AddBreakpoint(breakpoint)
 }
 
@@ -72,6 +74,12 @@ func (w *mainWindow) sidebarView() *adw.ToolbarView {
 
 	w.list.AddCSSClass("navigation-sidebar")
 	w.list.SetSelectionMode(gtk.SelectionSingle)
+	w.list.ConnectRowActivated(func(row *gtk.ListBoxRow) {
+		w.activateAppRow(row)
+	})
+	w.list.ConnectRowSelected(func(row *gtk.ListBoxRow) {
+		w.selectAppRow(row)
+	})
 
 	scroller := gtk.NewScrolledWindow()
 	scroller.SetPolicy(gtk.PolicyNever, gtk.PolicyAutomatic)
@@ -160,26 +168,68 @@ func (w *mainWindow) loadApps() {
 }
 
 func (w *mainWindow) renderApps(infos []appherder.AppInfo) {
+	w.apps = infos
 	w.list.RemoveAll()
 	if len(infos) == 0 {
+		w.apps = nil
 		w.split.SetContent(adw.NewNavigationPage(emptyDetailsPage(), "AppHerder"))
 		return
 	}
 	for i, info := range infos {
-		info := info
-		row := adw.NewActionRow()
-		row.SetTitle(info.Name)
-		row.SetActivatable(true)
-		row.ConnectActivated(func() { w.showDetails(info) })
-		row.AddPrefix(appIcon(info, 40))
-		w.list.Append(row)
+		w.list.Append(appListRow(info))
 		if i == 0 {
-			w.showDetails(info)
+			w.showDetails(info, false)
 		}
 	}
 	if first := w.list.RowAtIndex(0); first != nil {
 		w.list.SelectRow(first)
 	}
+}
+
+func (w *mainWindow) activateAppRow(row *gtk.ListBoxRow) {
+	w.showDetailsForRow(row, true)
+}
+
+func (w *mainWindow) selectAppRow(row *gtk.ListBoxRow) {
+	w.showDetailsForRow(row, false)
+}
+
+func (w *mainWindow) showDetailsForRow(row *gtk.ListBoxRow, reveal bool) {
+	if row == nil {
+		return
+	}
+	index := row.Index()
+	if index < 0 || index >= len(w.apps) {
+		return
+	}
+	w.showDetails(w.apps[index], reveal)
+}
+
+func appListRow(info appherder.AppInfo) *gtk.ListBoxRow {
+	row := gtk.NewListBoxRow()
+	row.SetActivatable(true)
+	row.SetSelectable(true)
+
+	box := gtk.NewBox(gtk.OrientationHorizontal, 12)
+	box.SetMarginTop(8)
+	box.SetMarginBottom(8)
+	box.SetMarginStart(12)
+	box.SetMarginEnd(12)
+
+	icon := appIcon(info, 36)
+	icon.SetVAlign(gtk.AlignCenter)
+	box.Append(icon)
+
+	name := gtk.NewLabel(info.Name)
+	name.SetXAlign(0)
+	name.SetEllipsize(pango.EllipsizeEnd)
+	name.SetLines(1)
+	name.SetHExpand(true)
+	name.SetVAlign(gtk.AlignCenter)
+	box.Append(name)
+
+	row.SetChild(box)
+	return row
 }
 
 func appSummary(info appherder.AppInfo) string {
@@ -189,8 +239,11 @@ func appSummary(info appherder.AppInfo) string {
 	return info.AppID
 }
 
-func (w *mainWindow) showDetails(info appherder.AppInfo) {
+func (w *mainWindow) showDetails(info appherder.AppInfo, reveal bool) {
 	w.split.SetContent(adw.NewNavigationPage(w.appDetailsView(info), info.Name))
+	if reveal {
+		w.split.SetShowContent(true)
+	}
 }
 
 func (w *mainWindow) appDetailsView(info appherder.AppInfo) *adw.ToolbarView {
