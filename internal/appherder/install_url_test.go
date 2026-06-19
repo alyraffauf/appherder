@@ -4,12 +4,14 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"testing"
 )
 
 func TestInstallFromURLDownloadsAndCleansUp(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("TMPDIR", tmp)
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("not an appimage"))
 	}))
@@ -21,7 +23,7 @@ func TestInstallFromURLDownloadsAndCleansUp(t *testing.T) {
 		t.Fatal("expected error for non-AppImage content")
 	}
 
-	matches, _ := filepath.Glob(filepath.Join(os.TempDir(), "appherder-install-*.appimage"))
+	matches, _ := filepath.Glob(filepath.Join(tmp, "appherder-install-*.appimage"))
 	if len(matches) > 0 {
 		t.Fatalf("temp files left behind: %v", matches)
 	}
