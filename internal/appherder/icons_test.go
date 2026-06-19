@@ -1,6 +1,8 @@
 package appherder
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"testing/fstest"
 )
@@ -63,5 +65,62 @@ func TestResolveIconReturnsEmptyWhenNoIcon(t *testing.T) {
 	}
 	if got := resolveIcon(fsys); got != "" {
 		t.Fatalf("resolveIcon = %q, want empty", got)
+	}
+}
+
+func TestInstallIconPreservesExtension(t *testing.T) {
+	app, home := newTestApp(t)
+	fsys := fstest.MapFS{
+		"keepassxc.png": {Data: []byte("\x89PNG\r\n\x1a\npng")},
+	}
+
+	got, err := app.installIcon(fsys, "keepassxc.png", "keepassxc")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := filepath.Join(home, "AppImages", ".icons", "keepassxc.png")
+	if got != want {
+		t.Fatalf("installIcon = %q, want %q", got, want)
+	}
+}
+
+func TestInstallIconDetectsDirIconPNG(t *testing.T) {
+	app, home := newTestApp(t)
+	fsys := fstest.MapFS{
+		".DirIcon": {Data: []byte("\x89PNG\r\n\x1a\npng")},
+	}
+
+	got, err := app.installIcon(fsys, ".DirIcon", "keepassxc")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := filepath.Join(home, "AppImages", ".icons", "keepassxc.png")
+	if got != want {
+		t.Fatalf("installIcon = %q, want %q", got, want)
+	}
+}
+
+func TestInstallIconRemovesStaleSiblings(t *testing.T) {
+	app, home := newTestApp(t)
+	iconDir := filepath.Join(home, "AppImages", ".icons")
+	if err := os.MkdirAll(iconDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	stale := filepath.Join(iconDir, "keepassxc.svg")
+	if err := os.WriteFile(stale, []byte("<svg/>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fsys := fstest.MapFS{
+		"keepassxc.png": {Data: []byte("\x89PNG\r\n\x1a\npng")},
+	}
+
+	if _, err := app.installIcon(fsys, "keepassxc.png", "keepassxc"); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Fatalf("expected stale icon to be removed, stat err: %v", err)
 	}
 }

@@ -61,6 +61,17 @@ func (a App) install(ctx context.Context, appimage string, want expectedChecksum
 	}
 	pin := fingerprint
 
+	var preparedIcon iconInstall
+	iconPath := ""
+	if icon != "" {
+		prepared, err := a.prepareIconInstall(fsys, icon, appName)
+		if err != nil {
+			return "", err
+		}
+		preparedIcon = prepared
+		iconPath = preparedIcon.path
+	}
+
 	// No desktop file inside the AppImage: synthesize a terminal launcher so
 	// CLI apps still get a menu entry and are tracked by managedApps.
 	if desktop == nil {
@@ -71,7 +82,7 @@ func (a App) install(ctx context.Context, appimage string, want expectedChecksum
 	}
 
 	// Patch in memory before any filesystem writes so a failure here installs nothing.
-	if err := a.patchDesktopFile(desktop, appName, icon != ""); err != nil {
+	if err := a.patchDesktopFile(desktop, appName, iconPath); err != nil {
 		return "", err
 	}
 	if pin != "" {
@@ -86,8 +97,8 @@ func (a App) install(ctx context.Context, appimage string, want expectedChecksum
 		}
 	}
 
-	if icon != "" {
-		dest, err := a.installIcon(fsys, icon, appName)
+	if iconPath != "" {
+		dest, err := a.installPreparedIcon(preparedIcon, appName)
 		if err != nil {
 			rollback()
 			return "", err

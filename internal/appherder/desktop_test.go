@@ -25,15 +25,16 @@ Exec=upstream-app --private-window %U
 `
 
 func TestPatchDesktopFilePreservesDesktopActions(t *testing.T) {
-	a, home := newTestApp(t)
+	app, home := newTestApp(t)
 
 	desktop := desktopfile.Parse([]byte(sampleDesktopFile))
-	if err := a.patchDesktopFile(desktop, "example", true); err != nil {
+	iconPath := filepath.Join(home, "AppImages", ".icons", "example.png")
+	if err := app.patchDesktopFile(desktop, "example", iconPath); err != nil {
 		t.Fatal(err)
 	}
 
 	assertDesktopValue(t, desktop, desktopEntrySection, desktopOwnerKey, "true")
-	assertDesktopValue(t, desktop, desktopEntrySection, "Icon", filepath.Join(home, "AppImages", ".icons", "example"))
+	assertDesktopValue(t, desktop, desktopEntrySection, "Icon", iconPath)
 	assertDesktopValue(t, desktop, desktopEntrySection, "TryExec", filepath.Join(home, "AppImages", "example.appimage"))
 	assertDesktopExec(t, desktop, desktopEntrySection, []string{"env", "FOO=bar", "DESKTOPINTEGRATION=1", filepath.Join(home, "AppImages", "example.appimage"), "%U"})
 	assertDesktopExec(t, desktop, "Desktop Action new-window", []string{"env", "DESKTOPINTEGRATION=1", filepath.Join(home, "AppImages", "example.appimage"), "--new-window", "%U"})
@@ -96,11 +97,11 @@ func TestDeriveAppName(t *testing.T) {
 }
 
 func TestPatchDesktopFileSetsExecWhenMissing(t *testing.T) {
-	a, home := newTestApp(t)
+	app, home := newTestApp(t)
 	desktop := desktopfile.Parse([]byte(
 		"[Desktop Entry]\nType=Application\nName=Foo\nTerminal=true\n",
 	))
-	if err := a.patchDesktopFile(desktop, "foo", false); err != nil {
+	if err := app.patchDesktopFile(desktop, "foo", ""); err != nil {
 		t.Fatal(err)
 	}
 	assertDesktopValue(t, desktop, desktopEntrySection, "Terminal", "true")

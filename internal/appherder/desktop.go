@@ -55,12 +55,12 @@ func managedApps(applicationsDir string) ([]string, error) {
 	return apps, nil
 }
 
-func (a App) patchDesktopFile(desktop *desktopfile.File, appName string, hasIcon bool) error {
+func (a App) patchDesktopFile(desktop *desktopfile.File, appName string, iconPath string) error {
 	appimage := filepath.Join(a.appimagesDir, appName+".appimage")
 
 	desktop.Set(desktopEntrySection, desktopOwnerKey, "true")
-	if hasIcon {
-		desktop.Set(desktopEntrySection, "Icon", filepath.Join(a.iconsDir, appName))
+	if iconPath != "" {
+		desktop.Set(desktopEntrySection, "Icon", iconPath)
 	}
 	desktop.Set(desktopEntrySection, "TryExec", appimage)
 

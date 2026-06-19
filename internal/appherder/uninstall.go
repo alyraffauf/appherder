@@ -25,6 +25,11 @@ func (a App) Uninstall(name string, force bool) error {
 			return fmt.Errorf("remove %s: %w", path, err)
 		}
 	}
+	for _, path := range a.installedIconPaths(appName) {
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("remove %s: %w", path, err)
+		}
+	}
 
 	_ = os.RemoveAll(filepath.Join(a.appimagesDir, ".versions", appName))
 
@@ -38,4 +43,9 @@ func (a App) installedPaths(appName string) []string {
 		filepath.Join(a.applicationsDir, appName+".desktop"),
 		a.linkPath(appName),
 	}
+}
+
+func (a App) installedIconPaths(appName string) []string {
+	matches, _ := filepath.Glob(filepath.Join(a.iconsDir, appName+".*"))
+	return matches
 }
