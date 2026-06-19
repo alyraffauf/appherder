@@ -193,10 +193,12 @@ func matchByName[T any](items []T, pattern string, name func(T) string, kind str
 	return matches[0], nil
 }
 
+const apiResponseLimit = 4 * 1024 * 1024 // 4 MiB; real API responses are a few KB
+
 // decodeJSON decodes a JSON value from r, wrapping any error with desc.
 func decodeJSON[T any](r io.Reader, desc string) (T, error) {
 	var value T
-	if err := json.NewDecoder(r).Decode(&value); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r, apiResponseLimit)).Decode(&value); err != nil {
 		return value, fmt.Errorf("%s: %w", desc, err)
 	}
 	return value, nil

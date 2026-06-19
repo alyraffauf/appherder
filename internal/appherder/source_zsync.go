@@ -55,7 +55,7 @@ func fetchZsyncHeader(ctx context.Context, zsyncURL string) (map[string]string, 
 	}
 	defer resp.Body.Close()
 
-	header, err := parseZsyncHeader(resp.Body)
+	header, err := parseZsyncHeader(io.LimitReader(resp.Body, apiResponseLimit))
 	if err != nil {
 		return nil, fmt.Errorf("parse zsync control file %s: %w", zsyncURL, err)
 	}
