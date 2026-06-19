@@ -20,7 +20,7 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Install zsync
+      - name: Install release tools
         run: sudo apt-get update -qq && sudo apt-get install -y -qq zsync
 
       - name: Build AppDir
@@ -33,10 +33,21 @@ jobs:
             -ldflags "-s -w -X main.version=$GITHUB_REF_NAME" \
             -o AppDir/usr/bin/appherder ./cmd/appherder
 
+          # Bundle dwarfsextract so DwarFS AppImages do not need host tools.
+          DWARFS_VERSION=0.14.0
+          DWARFS_DIR="dwarfs-$DWARFS_VERSION-Linux-x86_64"
+          wget -q -O /tmp/dwarfs.tar.xz \
+            "https://github.com/mhx/dwarfs/releases/download/v$DWARFS_VERSION/$DWARFS_DIR.tar.xz"
+          tar -xf /tmp/dwarfs.tar.xz -C /tmp
+          install -Dm755 "/tmp/$DWARFS_DIR/bin/dwarfsextract" AppDir/usr/bin/dwarfsextract
+          test "$(PATH="$PWD/AppDir/usr/bin:$PATH" command -v dwarfsextract)" = "$PWD/AppDir/usr/bin/dwarfsextract"
+          AppDir/usr/bin/dwarfsextract --help >/dev/null
+
           # AppRun
           cat > AppDir/AppRun << 'EOF'
           #!/bin/bash
           HERE="$(dirname "$(readlink -f "$0")")"
+          export PATH="$HERE/usr/bin:$PATH"
           exec "$HERE/usr/bin/appherder" "$@"
           EOF
 
