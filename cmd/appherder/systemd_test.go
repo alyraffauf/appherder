@@ -1,7 +1,6 @@
 package main
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/alyraffauf/appherder/internal/appherder"
@@ -14,25 +13,20 @@ func TestRenderUnitTemplateUsesConfiguredPaths(t *testing.T) {
 		"/tmp/App Images/%apps/.icons",
 		"/tmp/bin dir",
 	)
-	template := strings.Join([]string{
-		"ExecStart={{BIN}} sync",
-		"PathChanged={{APPIMAGES_DIR}}",
-		"ReadWritePaths={{READ_WRITE_PATHS}}",
-	}, "\n")
+	template := "ExecStart={{BIN}} sync\n" +
+		"PathChanged={{APPIMAGES_DIR}}\n" +
+		"ReadWritePaths={{READ_WRITE_PATHS}}"
 
 	got, err := renderUnitTemplate(template, "/opt/app%herder", app)
 	if err != nil {
 		t.Fatalf("renderUnitTemplate: %v", err)
 	}
 
-	for _, want := range []string{
-		"ExecStart=/opt/app%%herder sync",
-		`PathChanged="/tmp/App Images/%%apps"`,
-		`ReadWritePaths="/tmp/App Images/%%apps" /tmp/data/applications "/tmp/bin dir"`,
-	} {
-		if !strings.Contains(got, want) {
-			t.Fatalf("rendered unit missing %q:\n%s", want, got)
-		}
+	want := "ExecStart=/opt/app%%herder sync\n" +
+		`PathChanged="/tmp/App Images/%%apps"` + "\n" +
+		`ReadWritePaths="/tmp/App Images/%%apps" /tmp/data/applications "/tmp/bin dir"`
+	if got != want {
+		t.Fatalf("rendered unit = %q, want %q", got, want)
 	}
 }
 
