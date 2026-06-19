@@ -11,10 +11,10 @@ import (
 )
 
 func (a App) Install(appimage string) (string, error) {
-	return a.install(appimage, expectedChecksum{})
+	return a.install(context.Background(), appimage, expectedChecksum{})
 }
 
-func (a App) install(appimage string, want expectedChecksum) (appName string, err error) {
+func (a App) install(ctx context.Context, appimage string, want expectedChecksum) (appName string, err error) {
 	appimage, err = filepath.Abs(appimage)
 	if err != nil {
 		return "", fmt.Errorf("resolve AppImage path %q: %w", appimage, err)
@@ -28,7 +28,7 @@ func (a App) install(appimage string, want expectedChecksum) (appName string, er
 		return "", err
 	}
 
-	fsys, closeAppImage, err := openAppImage(appimage)
+	fsys, closeAppImage, err := openAppImage(ctx, appimage)
 	if err != nil {
 		return "", err
 	}
@@ -124,7 +124,7 @@ func (a App) InstallFromURL(ctx context.Context, url string) (string, error) {
 		return "", err
 	}
 	defer os.Remove(tmpName)
-	return a.install(tmpName, expectedChecksum{})
+	return a.install(ctx, tmpName, expectedChecksum{})
 }
 
 // deriveAppName picks the canonical install name: the desktop entry's Name

@@ -124,7 +124,7 @@ func (a App) applyUpgrade(ctx context.Context, name string, rel Release) error {
 	}
 	defer os.Remove(tmpName)
 
-	_, err = a.install(tmpName, rel.expectedChecksum())
+	_, err = a.install(ctx, tmpName, rel.expectedChecksum())
 	return err
 }
 

@@ -57,8 +57,8 @@ func (a App) Sync(ctx context.Context, force bool) (SyncResult, error) {
 	}
 
 	// parallelMap preserves input order, so results stay deterministic.
-	installResults := parallelMap(ctx, files, installConcurrency, func(_ context.Context, f string) SyncInstall {
-		name, err := a.Install(f)
+	installResults := parallelMap(ctx, files, installConcurrency, func(ctx context.Context, f string) SyncInstall {
+		name, err := a.install(ctx, f, expectedChecksum{})
 		return SyncInstall{File: f, AppName: name, Err: err}
 	})
 

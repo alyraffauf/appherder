@@ -1,6 +1,7 @@
 package appherder
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -17,7 +18,7 @@ import (
 // openAppImage exposes a type-2 AppImage's filesystem as an fs.FS. Supports
 // SquashFS (in-process) and DwarFS (extracted via the runtime). Caller must
 // invoke the returned closer to release resources.
-func openAppImage(path string) (fs.FS, func(), error) {
+func openAppImage(ctx context.Context, path string) (fs.FS, func(), error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("open AppImage %s: %w", path, err)
@@ -31,7 +32,7 @@ func openAppImage(path string) (fs.FS, func(), error) {
 
 	if isDwarFS(file, offset) {
 		file.Close()
-		return openDwarFS(path)
+		return openDwarFS(ctx, path)
 	}
 
 	if isSquashFS(file, offset) {
@@ -280,7 +281,7 @@ func (a App) pruneVersions(dir string, keep int) {
 // readAppImageVersion returns the embedded version string from the AppImage's
 // desktop file, falling back to the file's mtime.
 func readAppImageVersion(path string) string {
-	if fsys, closeFs, err := openAppImage(path); err == nil {
+	if fsys, closeFs, err := openAppImage(context.Background(), path); err == nil {
 		defer closeFs()
 		if desktop, _, err := findDesktopFile(fsys); err == nil && desktop != nil {
 			if version, ok := desktop.Get(desktopEntrySection, "X-AppImage-Version"); ok && version != "" {
