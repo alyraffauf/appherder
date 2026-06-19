@@ -265,8 +265,11 @@ func (a App) pruneVersions(dir string, keep int) {
 		return
 	}
 	sort.Slice(files, func(i, j int) bool {
-		infoI, _ := files[i].Info()
-		infoJ, _ := files[j].Info()
+		infoI, errI := files[i].Info()
+		infoJ, errJ := files[j].Info()
+		if errI != nil || errJ != nil {
+			return false
+		}
 		return infoI.ModTime().Before(infoJ.ModTime())
 	})
 	for _, entry := range files[:len(files)-keep] {
