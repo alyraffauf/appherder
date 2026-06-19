@@ -31,6 +31,9 @@ func (a App) Rollback(appName string, version string) error {
 		return fmt.Errorf("check saved version %q: %w", version, err)
 	}
 
+	// Track where the current binary was moved so we can put it back if the
+	// second rename fails.
+	var movedCurrentTo string
 	if _, err := os.Stat(current); err == nil {
 		currentVersion := readAppImageVersion(current)
 		currentSaved := filepath.Join(versionsDir, currentVersion+".appimage")
@@ -38,10 +41,14 @@ func (a App) Rollback(appName string, version string) error {
 			if err := os.Rename(current, currentSaved); err != nil {
 				return fmt.Errorf("save current version before rollback: %w", err)
 			}
+			movedCurrentTo = currentSaved
 		}
 	}
 
 	if err := os.Rename(saved, current); err != nil {
+		if movedCurrentTo != "" {
+			os.Rename(movedCurrentTo, current) //nolint:errcheck
+		}
 		return fmt.Errorf("restore version %s: %w", version, err)
 	}
 	if err := os.Chmod(current, 0o755); err != nil {
