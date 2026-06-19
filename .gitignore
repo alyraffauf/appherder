@@ -4,5 +4,6 @@ squashfs-root/
 *.zsync
 AppDir/
 /appherder
+/appherder-gui
 /result
 /vendor
