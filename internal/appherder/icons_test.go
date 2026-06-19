@@ -1,7 +1,9 @@
 package appherder
 
 import (
+	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"testing/fstest"
@@ -123,4 +125,77 @@ func TestInstallIconRemovesStaleSiblings(t *testing.T) {
 	if _, err := os.Stat(stale); !os.IsNotExist(err) {
 		t.Fatalf("expected stale icon to be removed, stat err: %v", err)
 	}
+}
+
+func TestInstallAppImageWritesExtensionedDirIconPath(t *testing.T) {
+	if _, err := exec.LookPath("mksquashfs"); err != nil {
+		t.Skip("mksquashfs not installed")
+	}
+
+	app, home := newTestApp(t)
+	appimage := makeAppImageFixture(t, map[string][]byte{
+		".DirIcon": []byte("\x89PNG\r\n\x1a\npng"),
+		"keepassxc.desktop": []byte(
+			"[Desktop Entry]\n" +
+				"Type=Application\n" +
+				"Name=KeePassXC\n" +
+				"Exec=keepassxc %U\n",
+		),
+	})
+
+	name, err := app.Install(appimage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if name != "keepassxc" {
+		t.Fatalf("installed name = %q, want keepassxc", name)
+	}
+
+	iconPath := filepath.Join(home, "AppImages", ".icons", "keepassxc.png")
+	if _, err := os.Stat(iconPath); err != nil {
+		t.Fatalf("installed icon missing: %v", err)
+	}
+	desktop, err := os.ReadFile(filepath.Join(home, ".local", "share", "applications", "keepassxc.desktop"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "Icon=" + iconPath + "\n"
+	if !bytes.Contains(desktop, []byte(want)) {
+		t.Fatalf("desktop file missing %q:\n%s", want, desktop)
+	}
+}
+
+func makeAppImageFixture(t *testing.T, files map[string][]byte) string {
+	t.Helper()
+
+	root := filepath.Join(t.TempDir(), "root")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, content := range files {
+		path := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, content, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	squashfs := filepath.Join(t.TempDir(), "payload.squashfs")
+	cmd := exec.Command("mksquashfs", root, squashfs, "-noappend", "-quiet")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("mksquashfs: %v\n%s", err, out)
+	}
+	payload, err := os.ReadFile(squashfs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	layout := buildSignableELF(0, 0)
+	appimage := filepath.Join(t.TempDir(), "fixture.AppImage")
+	if err := os.WriteFile(appimage, append(layout.bytes, payload...), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return appimage
 }
