@@ -21,13 +21,19 @@ import (
 type mainWindow struct {
 	*adw.ApplicationWindow
 
-	app        appherder.App
-	split      *adw.NavigationSplitView
-	apps       []appherder.AppInfo
-	list       *gtk.ListBox
-	installBtn *gtk.MenuButton
-	menuBtn    *gtk.MenuButton
-	busy       int
+	app             appherder.App
+	split           *adw.NavigationSplitView
+	apps            []appherder.AppInfo
+	updateChecks    map[string]appherder.UpgradeCheck
+	checkingUpdates bool
+	checkedUpdates  bool
+	currentKey      string
+	list            *gtk.ListBox
+	installBtn      *gtk.MenuButton
+	menuBtn         *gtk.MenuButton
+	checkAction     *gio.SimpleAction
+	updateAllAction *gio.SimpleAction
+	busy            int
 }
 
 func newMainWindow(gtkApp *adw.Application, app appherder.App) *mainWindow {
@@ -55,6 +61,7 @@ func newMainWindow(gtkApp *adw.Application, app appherder.App) *mainWindow {
 	win.SetContent(win.split)
 
 	win.loadApps()
+	win.checkUpdates(false)
 	return win
 }
 
@@ -133,6 +140,7 @@ func (w *mainWindow) installActions() {
 
 	menu := gio.NewMenu()
 	updateSection := gio.NewMenu()
+	updateSection.Append("Check for Updates", "win.check-upgrades")
 	updateSection.Append("Update All", "win.apply-upgrades")
 	menu.AppendSection("", updateSection)
 	aboutSection := gio.NewMenu()
@@ -140,18 +148,21 @@ func (w *mainWindow) installActions() {
 	menu.AppendSection("", aboutSection)
 	w.menuBtn.SetMenuModel(menu)
 
-	w.addAction("apply-upgrades", w.applyUpgrades)
+	w.checkAction = w.addAction("check-upgrades", func() { w.checkUpdates(true) })
+	w.updateAllAction = w.addAction("apply-upgrades", w.applyUpgrades)
 	w.addAction("install-file", w.promptInstallFile)
 	w.addAction("install-url", w.promptInstallURL)
 	w.addAction("about", w.showAbout)
+	w.updateActionSensitivity()
 }
 
-func (w *mainWindow) addAction(name string, activate func()) {
+func (w *mainWindow) addAction(name string, activate func()) *gio.SimpleAction {
 	action := gio.NewSimpleAction(name, nil)
 	action.ConnectActivate(func(parameter *glib.Variant) {
 		activate()
 	})
 	w.AddAction(action)
+	return action
 }
 
 func (w *mainWindow) showAbout() {
@@ -186,17 +197,28 @@ func (w *mainWindow) renderApps(infos []appherder.AppInfo) {
 	w.list.RemoveAll()
 	if len(infos) == 0 {
 		w.apps = nil
+		w.currentKey = ""
 		w.split.SetContent(adw.NewNavigationPage(emptyDetailsPage(), "AppHerder"))
 		return
 	}
+	selected := w.currentKey
 	for i, info := range infos {
-		w.list.Append(appListRow(info))
-		if i == 0 {
+		w.list.Append(w.appListRow(info))
+		if selected == "" && i == 0 {
 			w.showDetails(info, false)
 		}
 	}
-	if first := w.list.RowAtIndex(0); first != nil {
-		w.list.SelectRow(first)
+	rowIndex := 0
+	if selected != "" {
+		for i, info := range infos {
+			if appKey(info) == selected {
+				rowIndex = i
+				break
+			}
+		}
+	}
+	if row := w.list.RowAtIndex(rowIndex); row != nil {
+		w.list.SelectRow(row)
 	}
 }
 
@@ -219,7 +241,7 @@ func (w *mainWindow) showDetailsForRow(row *gtk.ListBoxRow, reveal bool) {
 	w.showDetails(w.apps[index], reveal)
 }
 
-func appListRow(info appherder.AppInfo) *gtk.ListBoxRow {
+func (w *mainWindow) appListRow(info appherder.AppInfo) *gtk.ListBoxRow {
 	row := gtk.NewListBoxRow()
 	row.SetActivatable(true)
 	row.SetSelectable(true)
@@ -242,6 +264,16 @@ func appListRow(info appherder.AppInfo) *gtk.ListBoxRow {
 	name.SetVAlign(gtk.AlignCenter)
 	box.Append(name)
 
+	if w.updateAvailable(info) {
+		indicator := gtk.NewLabel("Update")
+		indicator.AddCSSClass("caption")
+		indicator.AddCSSClass("dim-label")
+		indicator.SetVAlign(gtk.AlignCenter)
+		indicator.SetMarginStart(6)
+		indicator.SetTooltipText("Update Available")
+		box.Append(indicator)
+	}
+
 	row.SetChild(box)
 	return row
 }
@@ -254,6 +286,7 @@ func appSummary(info appherder.AppInfo) string {
 }
 
 func (w *mainWindow) showDetails(info appherder.AppInfo, reveal bool) {
+	w.currentKey = appKey(info)
 	w.split.SetContent(adw.NewNavigationPage(w.appDetailsView(info), info.Name))
 	if reveal {
 		w.split.SetShowContent(true)
@@ -299,6 +332,13 @@ func (w *mainWindow) appDetailsView(info appherder.AppInfo) *adw.ToolbarView {
 	launch.ConnectClicked(func() { w.launchApp(info) })
 	actions.Append(launch)
 
+	if check, ok := w.updateCheck(info); ok && check.Available {
+		update := gtk.NewButtonWithLabel("Update")
+		update.AddCSSClass("pill")
+		update.ConnectClicked(func() { w.updateApp(info) })
+		actions.Append(update)
+	}
+
 	remove := gtk.NewButtonWithLabel("Remove")
 	remove.AddCSSClass("pill")
 	remove.AddCSSClass("destructive-action")
@@ -315,6 +355,7 @@ func (w *mainWindow) appDetailsView(info appherder.AppInfo) *adw.ToolbarView {
 		label string
 		value string
 	}{
+		{"Update Status", w.updateStatus(info)},
 		{"Version", orDash(info.Version)},
 		{"Size", sizeOrDash(info.Size)},
 		{"Update Source", sourceLabel(info.Source)},
@@ -367,19 +408,79 @@ func appIcon(info appherder.AppInfo, size int) *gtk.Image {
 	return image
 }
 
+func (w *mainWindow) checkUpdates(userInitiated bool) {
+	if w.checkingUpdates {
+		return
+	}
+	w.checkingUpdates = true
+	w.refreshVisibleApps()
+	w.updateActionSensitivity()
+
+	go func() {
+		checks, err := w.app.CheckUpgrades(context.Background())
+		w.idle(func() {
+			w.checkingUpdates = false
+			if err != nil {
+				if userInitiated {
+					w.showError("Could Not Check for Updates", err.Error())
+				}
+				w.updateActionSensitivity()
+				w.refreshVisibleApps()
+				return
+			}
+			w.updateChecks = checksByName(checks)
+			w.checkedUpdates = true
+			w.updateActionSensitivity()
+			w.refreshVisibleApps()
+		})
+	}()
+}
+
 func (w *mainWindow) applyUpgrades() {
 	w.run("Installing updates", func() (string, error) {
-		checks, err := w.app.CheckUpgrades(context.Background())
-		if err != nil {
-			return "", err
+		checks := w.availableChecks()
+		if len(checks) == 0 {
+			var err error
+			checks, err = w.app.CheckUpgrades(context.Background())
+			if err != nil {
+				return "", err
+			}
 		}
 		applied := w.app.ApplyUpgrades(context.Background(), checks)
 		upgraded, failed := summarizeApplied(applied)
-		w.idle(w.loadApps)
+		w.idle(func() {
+			w.updateChecks = nil
+			w.checkedUpdates = false
+			w.loadApps()
+			w.checkUpdates(false)
+		})
 		if upgraded == 0 && failed == 0 {
 			return "Everything is up to date", nil
 		}
 		return fmt.Sprintf("%d app%s upgraded, %d upgrade%s failed", upgraded, plural(upgraded), failed, plural(failed)), nil
+	})
+}
+
+func (w *mainWindow) updateApp(info appherder.AppInfo) {
+	check, ok := w.updateCheck(info)
+	if !ok || !check.Available {
+		return
+	}
+	w.run("Updating "+info.Name, func() (string, error) {
+		applied := w.app.ApplyUpgrades(context.Background(), []appherder.UpgradeCheck{check})
+		if len(applied) == 0 {
+			return info.Name + " is up to date", nil
+		}
+		if applied[0].Err != nil {
+			return "", applied[0].Err
+		}
+		w.idle(func() {
+			w.updateChecks = nil
+			w.checkedUpdates = false
+			w.loadApps()
+			w.checkUpdates(false)
+		})
+		return fmt.Sprintf("Updated %s to %s", info.Name, applied[0].Version), nil
 	})
 }
 
@@ -539,6 +640,32 @@ func (w *mainWindow) setBusy(delta int) {
 	sensitive := w.busy == 0
 	w.installBtn.SetSensitive(sensitive)
 	w.menuBtn.SetSensitive(sensitive)
+	w.updateActionSensitivity()
+}
+
+func (w *mainWindow) updateActionSensitivity() {
+	if w.checkAction != nil {
+		w.checkAction.SetEnabled(w.busy == 0 && !w.checkingUpdates)
+	}
+	if w.updateAllAction != nil {
+		w.updateAllAction.SetEnabled(w.busy == 0 && !w.checkingUpdates && len(w.availableChecks()) > 0)
+	}
+}
+
+func (w *mainWindow) refreshVisibleApps() {
+	if len(w.apps) == 0 {
+		return
+	}
+	w.renderApps(w.apps)
+	if w.currentKey == "" {
+		return
+	}
+	for _, info := range w.apps {
+		if appKey(info) == w.currentKey {
+			w.showDetails(info, false)
+			return
+		}
+	}
 }
 
 func (w *mainWindow) idle(fn func()) {
@@ -560,6 +687,63 @@ func looksLikeURL(s string) bool {
 
 func isAppImagePath(path string) bool {
 	return strings.EqualFold(filepath.Ext(path), ".appimage")
+}
+
+func (w *mainWindow) updateAvailable(info appherder.AppInfo) bool {
+	check, ok := w.updateCheck(info)
+	return ok && check.Available
+}
+
+func (w *mainWindow) updateStatus(info appherder.AppInfo) string {
+	if w.checkingUpdates {
+		return "Checking for updates"
+	}
+	check, ok := w.updateCheck(info)
+	if !ok {
+		if w.checkedUpdates {
+			return "Not managed by AppHerder"
+		}
+		return "Not checked yet"
+	}
+	if check.Err != nil {
+		return "Could not check"
+	}
+	if check.NoSource {
+		return "Unavailable"
+	}
+	if check.Available {
+		return "Update available: " + orDash(check.Release.Version)
+	}
+	return "Up to date"
+}
+
+func (w *mainWindow) updateCheck(info appherder.AppInfo) (appherder.UpgradeCheck, bool) {
+	if w.updateChecks == nil {
+		return appherder.UpgradeCheck{}, false
+	}
+	check, ok := w.updateChecks[upgradeKey(info)]
+	return check, ok
+}
+
+func (w *mainWindow) availableChecks() []appherder.UpgradeCheck {
+	if w.updateChecks == nil {
+		return nil
+	}
+	checks := make([]appherder.UpgradeCheck, 0, len(w.updateChecks))
+	for _, check := range w.updateChecks {
+		if check.Err == nil && !check.NoSource && check.Available {
+			checks = append(checks, check)
+		}
+	}
+	return checks
+}
+
+func checksByName(checks []appherder.UpgradeCheck) map[string]appherder.UpgradeCheck {
+	byName := make(map[string]appherder.UpgradeCheck, len(checks))
+	for _, check := range checks {
+		byName[check.Name] = check
+	}
+	return byName
 }
 
 func summarizeApplied(applied []appherder.UpgradeApplied) (upgraded, failed int) {
@@ -608,6 +792,13 @@ func appKey(info appherder.AppInfo) string {
 		return appherder.NormalizeAppName(info.Name)
 	}
 	return strings.TrimSuffix(filepath.Base(info.Filename), filepath.Ext(info.Filename))
+}
+
+func upgradeKey(info appherder.AppInfo) string {
+	if info.Filename != "" {
+		return strings.TrimSuffix(filepath.Base(info.Filename), filepath.Ext(info.Filename))
+	}
+	return appKey(info)
 }
 
 func sizeOrDash(bytes int64) string {
