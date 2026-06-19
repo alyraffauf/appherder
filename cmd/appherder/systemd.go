@@ -6,7 +6,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+
+	"github.com/alyraffauf/appherder/internal/appherder"
 )
 
 //go:embed systemd/*
@@ -22,14 +25,26 @@ var upgradeUnits = []string{
 	"appherder-upgrade.service",
 }
 
-func enableUnits(units []string) error {
-	if err := writeUnitFiles(units); err != nil {
+func enableUnits(a appherder.App, units []string) error {
+	if err := ensureServiceWritePaths(a); err != nil {
+		return err
+	}
+	if err := writeUnitFiles(a, units); err != nil {
 		return err
 	}
 	if err := runSystemctl("daemon-reload"); err != nil {
 		return err
 	}
 	return runSystemctl("enable", "--now", units[0])
+}
+
+func ensureServiceWritePaths(a appherder.App) error {
+	for _, path := range a.ServiceWritePaths() {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			return fmt.Errorf("create service write directory %s: %w", path, err)
+		}
+	}
+	return nil
 }
 
 func disableUnits(units []string) error {
@@ -56,9 +71,9 @@ func binaryPath() (string, error) {
 	return bin, nil
 }
 
-// writeUnitFiles renders the named templates with the appherder binary path
-// and writes them to the systemd user directory.
-func writeUnitFiles(names []string) error {
+// writeUnitFiles renders the named templates with the appherder binary and
+// configured directories, then writes them to the systemd user directory.
+func writeUnitFiles(a appherder.App, names []string) error {
 	bin, err := binaryPath()
 	if err != nil {
 		return err
@@ -75,14 +90,67 @@ func writeUnitFiles(names []string) error {
 		if err != nil {
 			return fmt.Errorf("read %s: %w", name, err)
 		}
-		escaped := strings.ReplaceAll(bin, "%", "%%")
-		rendered := strings.ReplaceAll(string(data), "{{BIN}}", escaped)
+		rendered, err := renderUnitTemplate(string(data), bin, a)
+		if err != nil {
+			return fmt.Errorf("render %s: %w", name, err)
+		}
 		dest := filepath.Join(userDir, name)
 		if err := os.WriteFile(dest, []byte(rendered), 0o644); err != nil {
 			return fmt.Errorf("write %s: %w", dest, err)
 		}
 	}
 	return nil
+}
+
+func renderUnitTemplate(template, bin string, a appherder.App) (string, error) {
+	appimagesDir, err := systemdPathValue(a.AppImagesDir())
+	if err != nil {
+		return "", err
+	}
+	writePaths, err := systemdPathList(a.ServiceWritePaths())
+	if err != nil {
+		return "", err
+	}
+
+	rendered := strings.ReplaceAll(template, "{{BIN}}", systemdSpecifierEscape(bin))
+	rendered = strings.ReplaceAll(rendered, "{{APPIMAGES_DIR}}", appimagesDir)
+	rendered = strings.ReplaceAll(rendered, "{{READ_WRITE_PATHS}}", writePaths)
+	return rendered, nil
+}
+
+func systemdPathList(paths []string) (string, error) {
+	seen := make(map[string]bool, len(paths))
+	values := make([]string, 0, len(paths))
+	for _, path := range paths {
+		if seen[path] {
+			continue
+		}
+		seen[path] = true
+		value, err := systemdPathValue(path)
+		if err != nil {
+			return "", err
+		}
+		values = append(values, value)
+	}
+	return strings.Join(values, " "), nil
+}
+
+func systemdPathValue(path string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("empty path")
+	}
+	if strings.ContainsAny(path, "\n\r") {
+		return "", fmt.Errorf("path contains a newline: %q", path)
+	}
+	escaped := systemdSpecifierEscape(path)
+	if strings.ContainsAny(escaped, " \t\"'\\") {
+		return strconv.Quote(escaped), nil
+	}
+	return escaped, nil
+}
+
+func systemdSpecifierEscape(value string) string {
+	return strings.ReplaceAll(value, "%", "%%")
 }
 
 func removeUnitFiles(names []string) error {

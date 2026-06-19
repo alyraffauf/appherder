@@ -56,3 +56,14 @@ func (a App) WithProgress(p Progress) App {
 	a.progress = p
 	return a
 }
+
+// AppImagesDir is the directory appherder manages as the source of truth.
+func (a App) AppImagesDir() string {
+	return a.appimagesDir
+}
+
+// ServiceWritePaths returns the directories systemd services need writable for
+// sync and upgrade. Icons and saved versions live under AppImagesDir.
+func (a App) ServiceWritePaths() []string {
+	return []string{a.appimagesDir, a.applicationsDir, a.binDir}
+}

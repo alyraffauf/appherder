@@ -33,8 +33,8 @@ func newRootCommand(a appherder.App, stdout io.Writer, stderr io.Writer) *cobra.
 		newMigrateCommand(a),
 		newUpgradeCommand(a),
 		newRollbackCommand(a),
-		newAutosyncCommand(),
-		newAutoupgradeCommand(),
+		newAutosyncCommand(a),
+		newAutoupgradeCommand(a),
 	)
 	return cmd
 }
@@ -253,26 +253,26 @@ func newUnlinkCommand(a appherder.App) *cobra.Command {
 	}
 }
 
-func newAutosyncCommand() *cobra.Command {
+func newAutosyncCommand(a appherder.App) *cobra.Command {
 	return newAutoCommand(
 		"autosync",
 		"Enable or disable automatic sync when AppImages change",
-		"Installs a systemd user unit that watches ~/AppImages and runs sync whenever a\n"+
-			"file is added or removed. No root required.",
+		"Installs a systemd user unit that watches the configured AppImages directory\n"+
+			"and runs sync whenever a file is added or removed. No root required.",
 		"Disable and remove the autosync watcher",
-		func() error { return enableUnits(syncUnits) },
+		func() error { return enableUnits(a, syncUnits) },
 		func() error { return disableUnits(syncUnits) },
 	)
 }
 
-func newAutoupgradeCommand() *cobra.Command {
+func newAutoupgradeCommand(a appherder.App) *cobra.Command {
 	return newAutoCommand(
 		"autoupgrade",
 		"Enable or disable daily automatic upgrades",
 		"Installs a systemd user timer that checks for and installs AppImage updates\n"+
 			"once a day. No root required.",
 		"Disable and remove the upgrade timer",
-		func() error { return enableUnits(upgradeUnits) },
+		func() error { return enableUnits(a, upgradeUnits) },
 		func() error { return disableUnits(upgradeUnits) },
 	)
 }
