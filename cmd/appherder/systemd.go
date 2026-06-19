@@ -75,7 +75,8 @@ func writeUnitFiles(names []string) error {
 		if err != nil {
 			return fmt.Errorf("read %s: %w", name, err)
 		}
-		rendered := strings.ReplaceAll(string(data), "{{BIN}}", bin)
+		escaped := strings.ReplaceAll(bin, "%", "%%")
+		rendered := strings.ReplaceAll(string(data), "{{BIN}}", escaped)
 		dest := filepath.Join(userDir, name)
 		if err := os.WriteFile(dest, []byte(rendered), 0o644); err != nil {
 			return fmt.Errorf("write %s: %w", dest, err)
