@@ -27,31 +27,6 @@ type SourceConfig struct {
 	URL     string `toml:"url"`
 }
 
-func (sc SourceConfig) ToSource() (Source, error) {
-	switch sc.Type {
-	case "github":
-		return githubReleaseSource{
-			owner:   sc.Owner,
-			repo:    sc.Repo,
-			tag:     sc.Tag,
-			pattern: sc.Pattern,
-		}, nil
-	case "gitlab":
-		return gitlabReleaseSource{
-			host:    sc.Host,
-			project: sc.Project,
-			tag:     sc.Tag,
-			pattern: sc.Pattern,
-		}, nil
-	case "zsync":
-		return zsyncURLSource{url: sc.URL}, nil
-	case "static":
-		return staticURLSource{url: sc.URL}, nil
-	default:
-		return nil, fmt.Errorf("unknown source type %q (expected github, gitlab, zsync, or static)", sc.Type)
-	}
-}
-
 func configPath() string {
 	return filepath.Join(xdg.ConfigHome, "appherder", "config.toml")
 }
