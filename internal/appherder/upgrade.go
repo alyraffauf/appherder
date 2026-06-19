@@ -30,16 +30,27 @@ type UpgradeApplied struct {
 	Err     error
 }
 
-// CheckUpgrades checks every AppImage in ~/AppImages for an available update.
-// Results come back in sorted filename order. Apps with no update info or
-// already current are included with NoSource/Available=false so the caller
-// can decide what to show.
+// CheckUpgrades checks appherder-managed AppImages for available updates.
+// Only apps whose desktop file carries the X-AppHerder=true marker are
+// included. Results come back in sorted filename order. Apps with no update
+// info or already current are included with NoSource/Available=false so the
+// caller can decide what to show.
 func (a App) CheckUpgrades(ctx context.Context) ([]UpgradeCheck, error) {
 	files, err := listAppImages(a.appimagesDir)
 	if err != nil {
 		return nil, err
 	}
-	return parallelMap(ctx, files, checkConcurrency, func(ctx context.Context, file string) UpgradeCheck {
+
+	var managed []string
+	for _, file := range files {
+		name := strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
+		desktop := filepath.Join(a.applicationsDir, name+".desktop")
+		if owned, _ := isManagedDesktop(desktop); owned {
+			managed = append(managed, file)
+		}
+	}
+
+	return parallelMap(ctx, managed, checkConcurrency, func(ctx context.Context, file string) UpgradeCheck {
 		return checkOne(ctx, file)
 	}), nil
 }
