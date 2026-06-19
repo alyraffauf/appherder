@@ -224,8 +224,8 @@ func newLinkCommand(a appherder.App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "link APP",
 		Short: "Add an installed AppImage to PATH",
-		Long: "Creates a symlink in ~/.local/bin so the AppImage can be invoked by its name\n" +
-			"from a terminal. The app must already be installed in ~/AppImages.",
+		Long: "Creates a symlink in the configured bin directory so the AppImage can be\n" +
+			"invoked by its name from a terminal. The app must already be installed.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := a.Link(args[0]); err != nil {
@@ -241,7 +241,7 @@ func newUnlinkCommand(a appherder.App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "unlink APP",
 		Short: "Remove an AppImage symlink from PATH",
-		Long:  "Removes the ~/.local/bin symlink created by `appherder link`.",
+		Long:  "Removes the bin directory symlink created by `appherder link`.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := a.Unlink(args[0]); err != nil {

@@ -1,8 +1,6 @@
 package appherder
 
 import (
-	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/adrg/xdg"
@@ -16,33 +14,41 @@ type App struct {
 	iconsDir        string
 	binDir          string
 	progress        Progress
+	config          Config
 }
 
-// NewApp returns an App wired to the current user's home directory. The
-// applications directory honors XDG_DATA_HOME; the user bin directory
-// (~/.local/bin) is not covered by the XDG spec and is derived from home.
+// NewApp returns an App wired to the current user's home directory and
+// ~/.config/appherder/config.toml. The applications directory honors
+// XDG_DATA_HOME.
 func NewApp() (App, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return App{}, fmt.Errorf("resolve home directory: %w", err)
-	}
+	cfg := loadConfig()
 	return NewAppWithDirs(
-		filepath.Join(home, "AppImages"),
+		cfg.AppImagesDir,
 		filepath.Join(xdg.DataHome, "applications"),
-		filepath.Join(home, "AppImages", ".icons"),
-		filepath.Join(home, ".local", "bin"),
-	), nil
+		filepath.Join(cfg.AppImagesDir, ".icons"),
+		cfg.BinDir,
+	).withConfig(cfg), nil
 }
 
 // NewAppWithDirs returns an App that uses the given directories directly,
-// for tests or non-standard layouts.
+// for tests or non-standard layouts. Config defaults are used.
 func NewAppWithDirs(appimagesDir, applicationsDir, iconsDir, binDir string) App {
 	return App{
 		appimagesDir:    appimagesDir,
 		applicationsDir: applicationsDir,
 		iconsDir:        iconsDir,
 		binDir:          binDir,
+		config: Config{
+			AppImagesDir:     appimagesDir,
+			MaxSavedVersions: 3,
+			BinDir:           binDir,
+		},
 	}
+}
+
+func (a App) withConfig(cfg Config) App {
+	a.config = cfg
+	return a
 }
 
 // WithProgress returns a copy of App that reports download progress to p.

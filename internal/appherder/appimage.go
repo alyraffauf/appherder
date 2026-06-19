@@ -227,7 +227,7 @@ func copyTo(src string, dest io.Writer) error {
 }
 
 // saveToVersions hardlinks src into .versions/appName/<version>.appimage,
-// pruning older versions to keep at most maxSavedVersions.
+// pruning older versions to keep at most MaxSavedVersions from config.
 func (a App) saveToVersions(src, appName string) error {
 	if _, err := os.Stat(src); os.IsNotExist(err) {
 		return nil
@@ -238,7 +238,7 @@ func (a App) saveToVersions(src, appName string) error {
 		return fmt.Errorf("create versions directory: %w", err)
 	}
 
-	a.pruneVersions(versionsDir, maxSavedVersions-1)
+	a.pruneVersions(versionsDir, a.config.MaxSavedVersions-1)
 
 	dest := filepath.Join(versionsDir, version+".appimage")
 	os.Remove(dest)
@@ -247,8 +247,6 @@ func (a App) saveToVersions(src, appName string) error {
 	}
 	return nil
 }
-
-const maxSavedVersions = 3
 
 // pruneVersions removes the oldest saved versions when the directory holds
 // more than keep files, sorting by mtime.

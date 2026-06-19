@@ -7,6 +7,7 @@ require (
 	github.com/ProtonMail/go-crypto v1.4.1
 	github.com/adrg/xdg v0.5.3
 	github.com/alyraffauf/goxdgdesktop v0.1.0
+	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/spf13/cobra v1.10.2
 )
 
