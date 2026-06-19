@@ -131,6 +131,10 @@ Some AppImages are signed by their publisher. The first time AppHerder installs 
 
 `appherder list` shows each app's status in the **SIGNATURE** column: `pinned` (key locked in), `signed` (carries a signature appherder hasn't pinned yet), or `none`.
 
+## Configuration
+
+AppHerder's directories and update sources can be customized via `~/.config/appherder/config.toml`. See [Configuration](docs/Configuration.md) for all options.
+
 ## Under the hood
 
 AppHerder reads the AppImage's filesystem to grab its icon and desktop entry. SquashFS images are parsed in-process. DwarFS images use the system dwarfsextract tool, falling back to the AppImage's own runtime when the tool isn't available. Everything it writes is tagged, so uninstall and sync only touch its own files.

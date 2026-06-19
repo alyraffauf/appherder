@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -97,9 +98,20 @@ func ReadUpdateInfo(path string) (string, error) {
 	return string(data), nil
 }
 
-// SourceForAppImage resolves an update source from the AppImage's embedded
-// update info. It returns (nil, nil) when the AppImage carries none.
-func SourceForAppImage(file string) (Source, error) {
+// SourceForAppImage resolves an update source for the given AppImage, checking
+// config.toml's [sources] table first, then falling back to the embedded
+// .upd_info ELF section. Returns (nil, nil) when no source is configured.
+func (a App) SourceForAppImage(file string) (Source, error) {
+	name := strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
+	if sc, ok := a.config.Sources[name]; ok {
+		return sc.ToSource()
+	}
+	return sourceFromELF(file)
+}
+
+// sourceFromELF reads the AppImage's embedded .upd_info ELF section and
+// returns a source, or (nil, nil) when the AppImage carries none.
+func sourceFromELF(file string) (Source, error) {
 	info, err := ReadUpdateInfo(file)
 	if err != nil {
 		return nil, err

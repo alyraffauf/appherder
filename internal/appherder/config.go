@@ -10,9 +10,46 @@ import (
 )
 
 type Config struct {
-	AppImagesDir     string `toml:"appimages_dir"`
-	MaxSavedVersions int    `toml:"max_saved_versions"`
-	BinDir           string `toml:"bin_dir"`
+	AppImagesDir     string                  `toml:"appimages_dir"`
+	MaxSavedVersions int                     `toml:"max_saved_versions"`
+	BinDir           string                  `toml:"bin_dir"`
+	Sources          map[string]SourceConfig `toml:"sources"`
+}
+
+type SourceConfig struct {
+	Type    string `toml:"type"`
+	Owner   string `toml:"owner"`
+	Repo    string `toml:"repo"`
+	Host    string `toml:"host"`
+	Project string `toml:"project"`
+	Tag     string `toml:"tag"`
+	Pattern string `toml:"pattern"`
+	URL     string `toml:"url"`
+}
+
+func (sc SourceConfig) ToSource() (Source, error) {
+	switch sc.Type {
+	case "github":
+		return githubReleaseSource{
+			owner:   sc.Owner,
+			repo:    sc.Repo,
+			tag:     sc.Tag,
+			pattern: sc.Pattern,
+		}, nil
+	case "gitlab":
+		return gitlabReleaseSource{
+			host:    sc.Host,
+			project: sc.Project,
+			tag:     sc.Tag,
+			pattern: sc.Pattern,
+		}, nil
+	case "zsync":
+		return zsyncURLSource{url: sc.URL}, nil
+	case "static":
+		return staticURLSource{url: sc.URL}, nil
+	default:
+		return nil, fmt.Errorf("unknown source type %q (expected github, gitlab, zsync, or static)", sc.Type)
+	}
 }
 
 func configPath() string {

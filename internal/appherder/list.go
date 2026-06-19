@@ -31,19 +31,17 @@ func (a App) List() ([]AppInfo, error) {
 
 	infos := make([]AppInfo, 0, len(appids))
 	for _, appid := range appids {
-		infos = append(infos, gatherAppInfo(a.applicationsDir, a.appimagesDir, appid))
+		infos = append(infos, a.gatherAppInfo(appid))
 	}
 	sort.Slice(infos, func(i, j int) bool { return infos[i].Name < infos[j].Name })
 	return infos, nil
 }
 
-// gatherAppInfo collects display metadata for appid from its installed desktop
-// file and AppImage.
-func gatherAppInfo(appsDir, appimagesDir, appid string) AppInfo {
+func (a App) gatherAppInfo(appid string) AppInfo {
 	info := AppInfo{AppID: appid, Source: "none"}
 
 	var pinned string
-	if desktop, err := desktopfile.Read(filepath.Join(appsDir, appid+".desktop")); err == nil {
+	if desktop, err := desktopfile.Read(filepath.Join(a.applicationsDir, appid+".desktop")); err == nil {
 		if name, ok := desktop.Get(desktopEntrySection, "Name"); ok && name != "" {
 			info.Name = name
 		}
@@ -57,13 +55,13 @@ func gatherAppInfo(appsDir, appimagesDir, appid string) AppInfo {
 	}
 
 	var signed bool
-	if path, err := findAppImagePath(appimagesDir, appid); err == nil && path != "" {
+	if path, err := findAppImagePath(a.appimagesDir, appid); err == nil && path != "" {
 		info.Path = path
 		info.Filename = filepath.Base(path)
 		if stat, err := os.Stat(path); err == nil {
 			info.Size = stat.Size()
 		}
-		if src, err := SourceForAppImage(path); err == nil && src != nil {
+		if src, err := a.SourceForAppImage(path); err == nil && src != nil {
 			info.Source = src.Kind()
 		}
 		signed = appImageSigned(path)

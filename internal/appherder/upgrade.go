@@ -50,9 +50,7 @@ func (a App) CheckUpgrades(ctx context.Context) ([]UpgradeCheck, error) {
 		}
 	}
 
-	return parallelMap(ctx, managed, checkConcurrency, func(ctx context.Context, file string) UpgradeCheck {
-		return checkOne(ctx, file)
-	}), nil
+	return parallelMap(ctx, managed, checkConcurrency, a.checkOne), nil
 }
 
 // ApplyUpgrades downloads and installs updates for the given checks, processing
@@ -74,11 +72,10 @@ func (a App) ApplyUpgrades(ctx context.Context, checks []UpgradeCheck) []Upgrade
 	return applied
 }
 
-// checkOne resolves an AppImage's source and reports whether an update exists.
-func checkOne(ctx context.Context, file string) UpgradeCheck {
+func (a App) checkOne(ctx context.Context, file string) UpgradeCheck {
 	name := strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 
-	src, err := SourceForAppImage(file)
+	src, err := a.SourceForAppImage(file)
 	if err != nil {
 		return UpgradeCheck{Name: name, Err: err}
 	}
