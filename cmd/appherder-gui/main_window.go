@@ -27,6 +27,8 @@ type mainWindow struct {
 	updateChecks    map[string]appherder.UpgradeCheck
 	checkingUpdates bool
 	checkedUpdates  bool
+	updatingKey     string
+	updatingAll     bool
 	currentKey      string
 	list            *gtk.ListBox
 	installBtn      *gtk.MenuButton
@@ -264,7 +266,15 @@ func (w *mainWindow) appListRow(info appherder.AppInfo) *gtk.ListBoxRow {
 	name.SetVAlign(gtk.AlignCenter)
 	box.Append(name)
 
-	if w.updateAvailable(info) {
+	if w.isUpdating(info) {
+		indicator := gtk.NewSpinner()
+		indicator.SetSpinning(true)
+		indicator.SetSizeRequest(16, 16)
+		indicator.SetVAlign(gtk.AlignCenter)
+		indicator.SetMarginStart(6)
+		indicator.SetTooltipText("Updating")
+		box.Append(indicator)
+	} else if w.updateAvailable(info) {
 		indicator := gtk.NewLabel("Update")
 		indicator.AddCSSClass("caption")
 		indicator.AddCSSClass("dim-label")
@@ -329,19 +339,26 @@ func (w *mainWindow) appDetailsView(info appherder.AppInfo) *adw.ToolbarView {
 	launch := gtk.NewButtonWithLabel("Launch")
 	launch.AddCSSClass("pill")
 	launch.AddCSSClass("suggested-action")
+	launch.SetSensitive(w.busy == 0)
 	launch.ConnectClicked(func() { w.launchApp(info) })
 	actions.Append(launch)
 
 	if check, ok := w.updateCheck(info); ok && check.Available {
-		update := gtk.NewButtonWithLabel("Update")
-		update.AddCSSClass("pill")
-		update.ConnectClicked(func() { w.updateApp(info) })
-		actions.Append(update)
+		if w.isUpdating(info) {
+			actions.Append(progressButton("Updating"))
+		} else {
+			update := gtk.NewButtonWithLabel("Update")
+			update.AddCSSClass("pill")
+			update.SetSensitive(w.busy == 0)
+			update.ConnectClicked(func() { w.updateApp(info) })
+			actions.Append(update)
+		}
 	}
 
 	remove := gtk.NewButtonWithLabel("Remove")
 	remove.AddCSSClass("pill")
 	remove.AddCSSClass("destructive-action")
+	remove.SetSensitive(w.busy == 0)
 	remove.ConnectClicked(func() { w.confirmUninstall(info) })
 	actions.Append(remove)
 
@@ -408,6 +425,26 @@ func appIcon(info appherder.AppInfo, size int) *gtk.Image {
 	return image
 }
 
+func progressButton(label string) *gtk.Button {
+	spinner := gtk.NewSpinner()
+	spinner.SetSpinning(true)
+	spinner.SetSizeRequest(16, 16)
+
+	text := gtk.NewLabel(label)
+
+	content := gtk.NewBox(gtk.OrientationHorizontal, 6)
+	content.SetHAlign(gtk.AlignCenter)
+	content.SetVAlign(gtk.AlignCenter)
+	content.Append(spinner)
+	content.Append(text)
+
+	button := gtk.NewButton()
+	button.AddCSSClass("pill")
+	button.SetChild(content)
+	button.SetSensitive(false)
+	return button
+}
+
 func (w *mainWindow) checkUpdates(userInitiated bool) {
 	if w.checkingUpdates {
 		return
@@ -437,7 +474,17 @@ func (w *mainWindow) checkUpdates(userInitiated bool) {
 }
 
 func (w *mainWindow) applyUpgrades() {
+	w.updatingAll = true
+	w.refreshVisibleApps()
+	w.updateActionSensitivity()
+
 	w.run("Installing updates", func() (string, error) {
+		defer w.idle(func() {
+			w.updatingAll = false
+			w.refreshVisibleApps()
+			w.updateActionSensitivity()
+		})
+
 		checks := w.availableChecks()
 		if len(checks) == 0 {
 			var err error
@@ -466,7 +513,17 @@ func (w *mainWindow) updateApp(info appherder.AppInfo) {
 	if !ok || !check.Available {
 		return
 	}
+	w.updatingKey = appKey(info)
+	w.refreshVisibleApps()
+	w.updateActionSensitivity()
+
 	w.run("Updating "+info.Name, func() (string, error) {
+		defer w.idle(func() {
+			w.updatingKey = ""
+			w.refreshVisibleApps()
+			w.updateActionSensitivity()
+		})
+
 		applied := w.app.ApplyUpgrades(context.Background(), []appherder.UpgradeCheck{check})
 		if len(applied) == 0 {
 			return info.Name + " is up to date", nil
@@ -641,14 +698,15 @@ func (w *mainWindow) setBusy(delta int) {
 	w.installBtn.SetSensitive(sensitive)
 	w.menuBtn.SetSensitive(sensitive)
 	w.updateActionSensitivity()
+	w.refreshVisibleApps()
 }
 
 func (w *mainWindow) updateActionSensitivity() {
 	if w.checkAction != nil {
-		w.checkAction.SetEnabled(w.busy == 0 && !w.checkingUpdates)
+		w.checkAction.SetEnabled(w.busy == 0 && !w.checkingUpdates && !w.updatingAll && w.updatingKey == "")
 	}
 	if w.updateAllAction != nil {
-		w.updateAllAction.SetEnabled(w.busy == 0 && !w.checkingUpdates && len(w.availableChecks()) > 0)
+		w.updateAllAction.SetEnabled(w.busy == 0 && !w.checkingUpdates && !w.updatingAll && w.updatingKey == "" && len(w.availableChecks()) > 0)
 	}
 }
 
@@ -694,7 +752,17 @@ func (w *mainWindow) updateAvailable(info appherder.AppInfo) bool {
 	return ok && check.Available
 }
 
+func (w *mainWindow) isUpdating(info appherder.AppInfo) bool {
+	return w.updatingAll && w.updateAvailable(info) || w.updatingKey == appKey(info)
+}
+
 func (w *mainWindow) updateStatus(info appherder.AppInfo) string {
+	if w.isUpdating(info) {
+		return "Updating"
+	}
+	if w.updatingAll {
+		return "Updating apps"
+	}
 	if w.checkingUpdates {
 		return "Checking for updates"
 	}
