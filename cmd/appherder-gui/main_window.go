@@ -11,6 +11,7 @@ import (
 
 	"github.com/alyraffauf/appherder/internal/appherder"
 	"github.com/diamondburned/gotk4-adwaita/pkg/adw"
+	"github.com/diamondburned/gotk4/pkg/gdk/v4"
 	"github.com/diamondburned/gotk4/pkg/gio/v2"
 	"github.com/diamondburned/gotk4/pkg/glib/v2"
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
@@ -49,6 +50,7 @@ func newMainWindow(gtkApp *adw.Application, app appherder.App) *mainWindow {
 	win.split.SetSidebar(adw.NewNavigationPage(win.sidebarView(), "AppHerder"))
 	win.split.SetContent(adw.NewNavigationPage(emptyDetailsPage(), "AppHerder"))
 	win.installBreakpoints()
+	win.installDropTarget()
 
 	win.SetContent(win.split)
 
@@ -62,6 +64,18 @@ func (w *mainWindow) installBreakpoints() {
 	breakpoint.AddSetterDirect(w.split.Object, "collapsed", glib.NewValue(true))
 	breakpoint.AddSetterDirect(w.split.Object, "show-content", glib.NewValue(false))
 	w.AddBreakpoint(breakpoint)
+}
+
+func (w *mainWindow) installDropTarget() {
+	target := gtk.NewDropTarget(gdk.GTypeFileList, gdk.ActionCopy)
+	target.ConnectDrop(func(value *glib.Value, x, y float64) bool {
+		fileList, ok := value.GoValue().(*gdk.FileList)
+		if !ok || fileList == nil {
+			return false
+		}
+		return w.installDroppedFiles(fileList.Files())
+	})
+	w.split.AddController(target)
 }
 
 func (w *mainWindow) sidebarView() *adw.ToolbarView {
@@ -440,6 +454,27 @@ func (w *mainWindow) promptInstallURL() {
 	dialog.Present(w)
 }
 
+func (w *mainWindow) installDroppedFiles(files []*gio.File) bool {
+	if len(files) == 0 {
+		return false
+	}
+	if len(files) > 1 {
+		w.showError("Cannot Install Files", "Drop one AppImage at a time.")
+		return false
+	}
+	path := files[0].Path()
+	if path == "" {
+		w.showError("Cannot Install File", "Drop a local AppImage file.")
+		return false
+	}
+	if !isAppImagePath(path) {
+		w.showError("Cannot Install File", "Drop a file ending in .AppImage.")
+		return false
+	}
+	w.install(path)
+	return true
+}
+
 func (w *mainWindow) install(target string) {
 	w.run("Installing AppImage", func() (string, error) {
 		var name string
@@ -521,6 +556,10 @@ func (w *mainWindow) showError(title, message string) {
 func looksLikeURL(s string) bool {
 	parsed, err := url.Parse(s)
 	return err == nil && (parsed.Scheme == "http" || parsed.Scheme == "https") && parsed.Host != ""
+}
+
+func isAppImagePath(path string) bool {
+	return strings.EqualFold(filepath.Ext(path), ".appimage")
 }
 
 func summarizeApplied(applied []appherder.UpgradeApplied) (upgraded, failed int) {
