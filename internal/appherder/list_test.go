@@ -135,7 +135,7 @@ func TestListFallsBackToFilenameForName(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Desktop file with no Name= field — list should fall back to the filename.
+	// Desktop file with no Name= field; list should fall back to the filename.
 	if err := os.WriteFile(filepath.Join(appimages, "noname.appimage"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}

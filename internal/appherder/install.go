@@ -20,6 +20,14 @@ func (a App) install(appimage string, want expectedChecksum) (appName string, er
 		return "", fmt.Errorf("resolve AppImage path %q: %w", appimage, err)
 	}
 
+	// Verify before openAppImage: the DwarFS fallback executes the AppImage to
+	// extract it, so bad images must be refused first. Pinned-key check is
+	// deferred until the app name is known from the desktop file inside.
+	fingerprint, err := verifyAppImage(appimage, "", want)
+	if err != nil {
+		return "", err
+	}
+
 	fsys, closeAppImage, err := openAppImage(appimage)
 	if err != nil {
 		return "", err
@@ -41,12 +49,17 @@ func (a App) install(appimage string, want expectedChecksum) (appName string, er
 	icon := resolveIcon(fsys)
 	appName = deriveAppName(desktop, desktopName, appimage)
 
-	// Verify integrity and signature before any filesystem writes, so a refused
-	// AppImage installs nothing.
-	pin, err := verifyAppImage(appimage, a.pinnedSigningKey(appName), want)
-	if err != nil {
-		return "", err
+	// Pinned-key check deferred from above; app name now known.
+	pinned := a.pinnedSigningKey(appName)
+	if pinned != "" {
+		if fingerprint == "" {
+			return "", fmt.Errorf("refusing unsigned AppImage: a signing key is pinned (%s); uninstall and reinstall to trust a different build", pinned)
+		}
+		if !strings.EqualFold(pinned, fingerprint) {
+			return "", fmt.Errorf("refusing AppImage: signing key changed (pinned %s, got %s); uninstall and reinstall to trust the new key", pinned, fingerprint)
+		}
 	}
+	pin := fingerprint
 
 	// No desktop file inside the AppImage: synthesize a terminal launcher so
 	// CLI apps still get a menu entry and are tracked by managedApps.
@@ -114,9 +127,9 @@ func (a App) InstallFromURL(ctx context.Context, url string) (string, error) {
 	return a.install(tmpName, expectedChecksum{})
 }
 
-// deriveAppName picks the canonical install name, matching GearLever so the
-// two tools land at the same path: the desktop entry's Name field (e.g.
-// "ES-DE" -> "esde"), then the desktop-file id, then the source filename.
+// deriveAppName picks the canonical install name: the desktop entry's Name
+// field (e.g. "ES-DE" -> "esde"), then the desktop-file id, then the source
+// filename.
 func deriveAppName(desktop *desktopfile.File, desktopName string, appimagePath string) string {
 	if desktop != nil {
 		if name, ok := desktop.Get(desktopEntrySection, "Name"); ok && name != "" {
@@ -130,8 +143,7 @@ func deriveAppName(desktop *desktopfile.File, desktopName string, appimagePath s
 }
 
 // sanitizeAppName lowercases s, turns spaces into underscores, and drops any
-// character that isn't alphanumeric, underscore, or dot — GearLever's naming
-// rule.
+// character that isn't alphanumeric, underscore, or dot.
 func sanitizeAppName(name string) string {
 	name = strings.ToLower(name)
 	name = strings.ReplaceAll(name, " ", "_")

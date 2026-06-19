@@ -151,7 +151,7 @@ func findAppImagePath(dir, appid string) (string, error) {
 }
 
 // appImageBackedOrphans returns appids of unmanaged desktop entries whose
-// TryExec or Exec points at a missing file inside appimagesDir — launchers left
+// TryExec or Exec points at a missing file inside appimagesDir; launchers left
 // by another tool after their AppImage was deleted.
 func appImageBackedOrphans(applicationsDir, appimagesDir string) ([]string, error) {
 	matches, err := filepath.Glob(filepath.Join(applicationsDir, "*.desktop"))

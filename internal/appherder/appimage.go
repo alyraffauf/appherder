@@ -38,7 +38,7 @@ func openAppImage(path string) (fs.FS, func(), error) {
 		return openSquashFS(file, offset)
 	}
 
-	// Not at the expected offset — try scanning forward.
+	// Not at the expected offset; try scanning forward.
 	if scanned, ok := scanForSquashFS(file, offset); ok {
 		return openSquashFS(file, scanned)
 	}
