@@ -30,7 +30,7 @@ func bestRootIcon(fsys fs.FS) string {
 	var picker iconPicker
 	for _, entry := range entries {
 		if !entry.IsDir() {
-			picker.consider(entry.Name(), entry)
+			picker.consider(entry.Name())
 		}
 	}
 	return picker.best
@@ -43,32 +43,25 @@ func bestThemedIcon(fsys fs.FS) string {
 			if err != nil || entry.IsDir() {
 				return nil
 			}
-			picker.consider(name, entry)
+			picker.consider(name)
 			return nil
 		})
 	}
 	return picker.best
 }
 
-// iconPicker keeps the best icon seen, preferring format rank then larger size.
+// iconPicker keeps the best icon seen, preferring svg > png > xpm.
 type iconPicker struct {
 	best string
 	rank int
-	size int64
 }
 
-func (p *iconPicker) consider(name string, entry fs.DirEntry) {
+func (p *iconPicker) consider(name string) {
 	rank := iconRank(name)
-	if rank < 0 {
+	if rank < 0 || (p.best != "" && rank <= p.rank) {
 		return
 	}
-	info, err := entry.Info()
-	if err != nil {
-		return
-	}
-	if p.best == "" || rank > p.rank || (rank == p.rank && info.Size() > p.size) {
-		p.best, p.rank, p.size = name, rank, info.Size()
-	}
+	p.best, p.rank = name, rank
 }
 
 // iconRank ranks icon extensions (higher preferred); -1 means not an icon.
