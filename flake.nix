@@ -33,8 +33,18 @@
           packages = with pkgs; [
             go
             dwarfs
+            pkg-config
+            glib
+            gobject-introspection
+            gtk4
+            libadwaita
             self.formatter.${system}
           ];
+
+          shellHook = ''
+            export GOCACHE="''${XDG_CACHE_HOME:-$HOME/.cache}/appherder/go-build"
+            mkdir -p "$GOCACHE"
+          '';
         };
       }
     );
@@ -42,9 +52,16 @@
     formatter = forEachSupportedSystem ({pkgs, ...}: pkgs.alejandra);
 
     packages = forEachSupportedSystem (
-      {pkgs, ...}: {
-        default = pkgs.callPackage ./package.nix {};
-      }
+      {pkgs, ...}: let
+        appherder = pkgs.callPackage ./package.nix {};
+      in
+        {
+          default = appherder;
+          inherit appherder;
+        }
+        // lib.optionalAttrs pkgs.stdenv.isLinux {
+          appherder-gui = pkgs.callPackage ./package-gui.nix {};
+        }
     );
   };
 }
