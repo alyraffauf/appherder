@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -75,4 +76,40 @@ func httpGetOK(ctx context.Context, url, desc string, customize func(*http.Reque
 		return nil, fmt.Errorf("%s: %s", desc, resp.Status)
 	}
 	return resp, nil
+}
+
+// downloadToTemp downloads url to a temporary file and returns its path. The
+// caller must remove the file.
+func downloadToTemp(ctx context.Context, url, prefix string, progress Progress, name string) (string, error) {
+	tmp, err := os.CreateTemp("", prefix+"-*.appimage")
+	if err != nil {
+		return "", fmt.Errorf("create temporary file: %w", err)
+	}
+	tmpName := tmp.Name()
+	if err := download(ctx, url, tmp, progress, name); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return "", err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpName)
+		return "", fmt.Errorf("close download: %w", err)
+	}
+	return tmpName, nil
+}
+
+func download(ctx context.Context, url string, writer io.Writer, progress Progress, name string) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	resp, err := httpGetOK(ctx, url, fmt.Sprintf("download %s", url), nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	body := io.Reader(newIdleTimeoutReader(resp.Body, downloadIdleTimeout, cancel))
+	body = newProgressReader(body, progress, name, resp.ContentLength)
+	_, err = io.Copy(writer, body)
+	return err
 }

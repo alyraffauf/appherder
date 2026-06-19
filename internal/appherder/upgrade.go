@@ -2,12 +2,9 @@ package appherder
 
 import (
 	"context"
-	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 )
 
 // checkConcurrency caps concurrent update checks: enough to overlap network
@@ -95,28 +92,6 @@ func (a App) checkOne(ctx context.Context, file string) UpgradeCheck {
 	return UpgradeCheck{Name: name, Release: rel, Available: !current}
 }
 
-// parallelMap applies fn to each item with at most `limit` concurrent calls,
-// returning results in input order.
-func parallelMap[T, R any](ctx context.Context, items []T, limit int, fn func(context.Context, T) R) []R {
-	if limit < 1 {
-		limit = 1
-	}
-	results := make([]R, len(items))
-	sem := make(chan struct{}, limit)
-	var wg sync.WaitGroup
-	for i, item := range items {
-		wg.Add(1)
-		sem <- struct{}{}
-		go func(i int, item T) {
-			defer wg.Done()
-			defer func() { <-sem }()
-			results[i] = fn(ctx, item)
-		}(i, item)
-	}
-	wg.Wait()
-	return results
-}
-
 func (a App) applyUpgrade(ctx context.Context, name string, rel Release) error {
 	tmpName, err := downloadToTemp(ctx, rel.URL, "appherder-upgrade", a.progress, name)
 	if err != nil {
@@ -125,41 +100,5 @@ func (a App) applyUpgrade(ctx context.Context, name string, rel Release) error {
 	defer os.Remove(tmpName)
 
 	_, err = a.install(ctx, tmpName, rel.expectedChecksum())
-	return err
-}
-
-// downloadToTemp downloads url to a temporary file and returns its path. The
-// caller must remove the file.
-func downloadToTemp(ctx context.Context, url, prefix string, progress Progress, name string) (string, error) {
-	tmp, err := os.CreateTemp("", prefix+"-*.appimage")
-	if err != nil {
-		return "", fmt.Errorf("create temporary file: %w", err)
-	}
-	tmpName := tmp.Name()
-	if err := download(ctx, url, tmp, progress, name); err != nil {
-		tmp.Close()
-		os.Remove(tmpName)
-		return "", err
-	}
-	if err := tmp.Close(); err != nil {
-		os.Remove(tmpName)
-		return "", fmt.Errorf("close download: %w", err)
-	}
-	return tmpName, nil
-}
-
-func download(ctx context.Context, url string, writer io.Writer, progress Progress, name string) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	resp, err := httpGetOK(ctx, url, fmt.Sprintf("download %s", url), nil)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	body := io.Reader(newIdleTimeoutReader(resp.Body, downloadIdleTimeout, cancel))
-	body = newProgressReader(body, progress, name, resp.ContentLength)
-	_, err = io.Copy(writer, body)
 	return err
 }

@@ -14,11 +14,7 @@ import (
 var version = "dev"
 
 func main() {
-	app, err := appherder.NewApp()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+	app := appherder.NewApp()
 
 	appID := "io.github.alyraffauf.AppHerder"
 	gtkApp := adw.NewApplication(appID, gio.ApplicationFlagsNone)

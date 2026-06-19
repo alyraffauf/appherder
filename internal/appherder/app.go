@@ -20,14 +20,14 @@ type App struct {
 // NewApp returns an App wired to the current user's home directory and
 // ~/.config/appherder/config.toml. The applications directory honors
 // XDG_DATA_HOME.
-func NewApp() (App, error) {
+func NewApp() App {
 	cfg := loadConfig()
 	return NewAppWithDirs(
 		cfg.AppImagesDir,
 		filepath.Join(xdg.DataHome, "applications"),
 		filepath.Join(cfg.AppImagesDir, ".icons"),
 		cfg.BinDir,
-	).withConfig(cfg), nil
+	).withConfig(cfg)
 }
 
 // NewAppWithDirs returns an App that uses the given directories directly,

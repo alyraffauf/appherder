@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/alyraffauf/goxdgdesktop/desktopfile"
@@ -95,30 +94,6 @@ func (a App) Sync(ctx context.Context, force bool) (SyncResult, error) {
 	return result, nil
 }
 
-// listAppImages returns *.appimage files in dir, case-insensitive (the
-// AppImage spec uses .AppImage, but .appimage is common).
-func listAppImages(dir string) ([]string, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	var files []string
-	for _, entry := range entries {
-		if entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
-			continue
-		}
-		if !strings.EqualFold(filepath.Ext(entry.Name()), ".appimage") {
-			continue
-		}
-		files = append(files, filepath.Join(dir, entry.Name()))
-	}
-	sort.Strings(files)
-	return files, nil
-}
-
 // appImagePresent reports whether <appid>.appimage exists in dir, matching the
 // extension case-insensitively.
 func appImagePresent(dir, appid string) (bool, error) {
@@ -127,27 +102,6 @@ func appImagePresent(dir, appid string) (bool, error) {
 		return false, err
 	}
 	return path != "", nil
-}
-
-// findAppImagePath returns the full path of <appid>.appimage in dir, matching
-// the extension case-insensitively, or "" when absent.
-func findAppImagePath(dir, appid string) (string, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return "", nil
-		}
-		return "", err
-	}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		if strings.EqualFold(entry.Name(), appid+".appimage") {
-			return filepath.Join(dir, entry.Name()), nil
-		}
-	}
-	return "", nil
 }
 
 // appImageBackedOrphans returns appids of unmanaged desktop entries whose

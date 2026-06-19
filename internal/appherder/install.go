@@ -169,3 +169,12 @@ func isTerminalApp(desktop *desktopfile.File) bool {
 	val, ok := desktop.Get(desktopEntrySection, "Terminal")
 	return ok && strings.EqualFold(val, "true")
 }
+
+// NormalizeAppName strips directory and .appimage extension from name.
+func NormalizeAppName(name string) string {
+	name = filepath.Base(name)
+	if ext := filepath.Ext(name); strings.EqualFold(ext, ".appimage") {
+		name = strings.TrimSuffix(name, ext)
+	}
+	return name
+}
