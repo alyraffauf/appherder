@@ -24,8 +24,11 @@ func (a App) Rollback(appName string, version string) error {
 	}
 
 	saved := filepath.Join(versionsDir, version+".appimage")
-	if _, err := os.Stat(saved); os.IsNotExist(err) {
-		return fmt.Errorf("version %q not found for %s", version, appName)
+	if _, err := os.Stat(saved); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("version %q not found for %s", version, appName)
+		}
+		return fmt.Errorf("check saved version %q: %w", version, err)
 	}
 
 	if _, err := os.Stat(current); err == nil {
