@@ -4,9 +4,3 @@ Description=Reconcile AppImages with installed applications
 [Service]
 Type=oneshot
 ExecStart={{BIN}} sync
-PrivateTmp=true
-ProtectSystem=strict
-RestrictSUIDSGID=true
-LockPersonality=true
-SystemCallArchitectures=native
-ReadWritePaths={{READ_WRITE_PATHS}}

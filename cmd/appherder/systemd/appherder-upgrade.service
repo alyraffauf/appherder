@@ -4,9 +4,3 @@ Description=Download and install available AppImage updates
 [Service]
 Type=oneshot
 ExecStart={{BIN}} upgrade
-PrivateTmp=true
-ProtectSystem=strict
-RestrictSUIDSGID=true
-LockPersonality=true
-SystemCallArchitectures=native
-ReadWritePaths={{READ_WRITE_PATHS}}
