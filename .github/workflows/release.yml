@@ -15,31 +15,57 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
+      - name: Set up Nix
+        uses: DeterminateSystems/nix-installer-action@main
 
       - name: Install release tools
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq zsync
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq binutils zsync
 
-      - name: Build AppDir
+      - name: Build release payload
         run: |
+          set -euo pipefail
+
+          export APPHERDER_RELEASE_VERSION="$GITHUB_REF_NAME"
+          export APPHERDER_RELEASE_SYSTEM="x86_64-linux"
+
+          nix build --impure --out-link result-appherder --expr '
+          let
+            flake = builtins.getFlake (toString ./.);
+            pkgs = import flake.inputs.nixpkgs {
+              system = builtins.getEnv "APPHERDER_RELEASE_SYSTEM";
+              config.allowUnfree = true;
+            };
+          in
+            pkgs.callPackage ./package.nix {
+              version = builtins.getEnv "APPHERDER_RELEASE_VERSION";
+            }
+          '
+
           mkdir -p AppDir/usr/bin
 
-          # Binary with tagged version
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-            go build -trimpath \
-            -ldflags "-s -w -X main.version=$GITHUB_REF_NAME" \
-            -o AppDir/usr/bin/appherder ./cmd/appherder
+          # Copy the real Go binary, not the Nix PATH wrapper.
+          if [ -x result-appherder/bin/.appherder-wrapped ]; then
+            install -Dm755 result-appherder/bin/.appherder-wrapped AppDir/usr/bin/appherder
+            install -Dm755 result-appherder/bin/.appherder-wrapped appherder-linux-amd64
+          else
+            install -Dm755 result-appherder/bin/appherder AppDir/usr/bin/appherder
+            install -Dm755 result-appherder/bin/appherder appherder-linux-amd64
+          fi
+
+          ./appherder-linux-amd64 --version | grep -F "appherder version $GITHUB_REF_NAME"
 
           # Bundle dwarfsextract so DwarFS AppImages do not need host tools.
-          DWARFS_VERSION=0.14.0
-          DWARFS_DIR="dwarfs-$DWARFS_VERSION-Linux-x86_64"
-          wget -q -O /tmp/dwarfs.tar.xz \
-            "https://github.com/mhx/dwarfs/releases/download/v$DWARFS_VERSION/$DWARFS_DIR.tar.xz"
-          tar -xf /tmp/dwarfs.tar.xz -C /tmp
-          install -Dm755 "/tmp/$DWARFS_DIR/bin/dwarfsextract" AppDir/usr/bin/dwarfsextract
+          nix build --impure --out-link result-dwarfs --expr '
+          let
+            flake = builtins.getFlake (toString ./.);
+            pkgs = import flake.inputs.nixpkgs {
+              system = builtins.getEnv "APPHERDER_RELEASE_SYSTEM";
+              config.allowUnfree = true;
+            };
+          in
+            pkgs.dwarfs
+          '
+          install -Dm755 result-dwarfs/bin/dwarfsextract AppDir/usr/bin/dwarfsextract
           test "$(PATH="$PWD/AppDir/usr/bin:$PATH" command -v dwarfsextract)" = "$PWD/AppDir/usr/bin/dwarfsextract"
           AppDir/usr/bin/dwarfsextract --help >/dev/null
 
@@ -86,22 +112,24 @@ jobs:
 
           chmod +x AppDir/AppRun
 
-      - name: Build plain binary
-        run: |
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-            go build -trimpath \
-            -ldflags "-s -w -X main.version=$GITHUB_REF_NAME" \
-            -o appherder-linux-amd64 ./cmd/appherder
-
       - name: Build AppImage
         run: |
+          set -euo pipefail
+
           APPIMAGE="appherder-$GITHUB_REF_NAME-x86_64.AppImage"
+          UPDATE_INFO="gh-releases-zsync|alyraffauf|appherder|latest|appherder-*x86_64.AppImage.zsync"
+
           wget -q -O /tmp/appimagetool.AppImage \
             https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x /tmp/appimagetool.AppImage
-          /tmp/appimagetool.AppImage \
-            -u "gh-releases-zsync|alyraffauf|appherder|latest|appherder-*x86_64.AppImage.zsync" \
+
+          APPIMAGE_EXTRACT_AND_RUN=1 /tmp/appimagetool.AppImage \
+            -u "$UPDATE_INFO" \
             AppDir "$APPIMAGE"
+
+          test -f "$APPIMAGE"
+          test -f "$APPIMAGE.zsync"
+          readelf -p .upd_info "$APPIMAGE" | grep -F "$UPDATE_INFO"
 
       - name: Publish release
         env:
