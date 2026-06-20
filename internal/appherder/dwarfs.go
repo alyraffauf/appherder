@@ -6,13 +6,12 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"time"
 )
 
-// openDwarFS extracts the DwarFS payload from an AppImage. Tries the system
-// dwarfsextract tool first; falls back to the AppImage's own --appimage-extract
-// as a last resort. Returns the extracted filesystem and a cleanup function.
+// openDwarFS extracts the DwarFS payload from an AppImage using dwarfsextract.
+// It intentionally does not fall back to --appimage-extract, because that
+// executes the AppImage runtime.
 func openDwarFS(ctx context.Context, appimagePath string) (fs.FS, func(), error) {
 	dir, err := os.MkdirTemp("", "appherder-dwarfs")
 	if err != nil {
@@ -23,38 +22,32 @@ func openDwarFS(ctx context.Context, appimagePath string) (fs.FS, func(), error)
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
-	cmd := extractCommand(ctx, appimagePath, dir)
+	cmd, err := extractCommand(ctx, appimagePath, dir)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
 	if out, err := cmd.CombinedOutput(); err != nil {
 		cleanup()
 		return nil, nil, fmt.Errorf("extract DwarFS AppImage: %w\n%s", err, out)
 	}
 
-	// dwarfsextract -o extracts directly; --appimage-extract nests under squashfs-root.
-	root := dir
-	if _, err := os.Stat(filepath.Join(dir, "squashfs-root")); err == nil {
-		root = filepath.Join(dir, "squashfs-root")
-	}
-	return os.DirFS(root), cleanup, nil
+	return os.DirFS(dir), cleanup, nil
 }
 
-func extractCommand(ctx context.Context, appimagePath, destDir string) *exec.Cmd {
+func extractCommand(ctx context.Context, appimagePath, destDir string) (*exec.Cmd, error) {
 	extract, err := exec.LookPath("dwarfsextract")
-	if err == nil {
-		return exec.CommandContext(ctx, extract,
-			"--input="+appimagePath,
-			"--output="+destDir,
-			"--pattern=**.desktop",
-			"--pattern=**.png",
-			"--pattern=**.svg",
-			"--pattern=.DirIcon",
-		)
+	if err != nil {
+		return nil, fmt.Errorf("find dwarfsextract: %w", err)
 	}
-	// Fall back to the AppImage's own --appimage-extract. The file must be
-	// executable for this to work.
-	os.Chmod(appimagePath, 0o755)
-	cmd := exec.CommandContext(ctx, appimagePath, "--appimage-extract")
-	cmd.Dir = destDir
-	return cmd
+	return exec.CommandContext(ctx, extract,
+		"--input="+appimagePath,
+		"--output="+destDir,
+		"--pattern=**.desktop",
+		"--pattern=**.png",
+		"--pattern=**.svg",
+		"--pattern=.DirIcon",
+	), nil
 }
 
 // isDwarFS reports whether the payload at offset starts with the DwarFS magic.

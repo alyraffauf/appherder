@@ -137,7 +137,7 @@ AppHerder's directories and update sources can be customized via `~/.config/apph
 
 ## Under the hood
 
-AppHerder reads the AppImage's filesystem to grab its icon and desktop entry. SquashFS images are parsed in-process. DwarFS images use the system dwarfsextract tool, falling back to the AppImage's own runtime when the tool isn't available. Everything it writes is tagged, so uninstall and sync only touch its own files.
+AppHerder reads the AppImage's filesystem to grab its icon and desktop entry. SquashFS images are parsed in-process. DwarFS images require `dwarfsextract`; the AppHerder CLI AppImage bundles it, while native and source installs need `dwarfsextract` available on `PATH`. AppHerder does not automatically fall back to `--appimage-extract`, because that executes the AppImage runtime. Everything it writes is tagged, so uninstall and sync only touch its own files.
 
 ## License
 
