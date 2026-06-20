@@ -5,17 +5,16 @@
   <h3>A shepherd for your AppImages.</h3>
 </div>
 
-AppHerder automatically installs, removes, and upgrades your AppImages. Throw them in `~/AppImages` and AppHerder does the rest: apps appear in your menu, deleted ones disappear from it, and supported apps update in place.
+AppHerder automatically installs, removes, and upgrades your AppImages. Throw them in `~/AppImages` and AppHerder does the rest: apps appear in your menu, deleted apps disappear, and supported apps update in place.
 
 ## Features
 
 - **Set it and forget it.** Watches `~/AppImages` and checks for updates in the background.
-- **Real apps, not loose files.** Installed AppImages show up natively in your application menu.
-- **Install from anywhere.** Point it at a local file or paste a download link.
-- **Updates without the pile-up.** A newer version replaces the old one.
+- **Real apps.** Installed AppImages show up natively in your application menu.
+- **In-place upgrades.** New versions seemlessly replace old ones.
 - **Verified updates.** Pins the publisher's signing key on first install, then refuses tampered updates.
-- **One-command rollback.** A bad update? Put the old version back instantly.
-- **Stays out of the way.** It only touches launchers it created. Your Flatpaks and hand-made shortcuts are safe.
+- **Quick rollbacks.** Bad update? Put the old version back instantly.
+- **Stays out of the way.** Only touches launchers it creates. Your other apps are safe.
 
 ## Installation
 
@@ -43,11 +42,11 @@ Download the `.AppImage` from the [latest release](https://github.com/alyraffauf
 ```bash
 chmod +x appherder-*-x86_64.AppImage
 ./appherder-*-x86_64.AppImage install ./appherder-*-x86_64.AppImage
-appherder autosync
-appherder autoupgrade
+appherder autosync # Watch ~/AppImages
+appherder autoupgrade # Enable automatic app upgrades
 ```
 
-The install step copies it into `~/AppImages` and links it to `~/.local/bin/appherder` automatically. You may need to restart your terminal or run `export PATH="$HOME/.local/bin:$PATH"` for the command to be found.
+The install step copies it into `~/AppImages` and links it to `~/.local/bin/appherder` automatically. You may need to restart your terminal or run `export PATH="$HOME/.local/bin:$PATH"` for the app to be found.
 
 ### Nix flake
 
@@ -76,7 +75,7 @@ appherder autosync             # sync whenever ~/AppImages changes
 appherder autoupgrade          # check for updates once a day
 ```
 
-Then use `~/AppImages` like the place AppImages belong. Add a file and it gets a launcher. Remove a file and its launcher goes away. When an update is available, appherder installs it without leaving the old copy behind.
+Then use `~/AppImages` like the place AppImages belong. Add a file and it gets a launcher. Remove a file and its launcher goes away. When an update is available, appherder installs it in-place (no app restarts needed).
 
 Install an app from a file or URL:
 
@@ -117,17 +116,17 @@ appherder upgrade --check      # just see what's out of date
 Undo a bad update:
 
 ```bash
-appherder rollback foo         # restore the version the last update replaced
+appherder rollback foo         # restore the last version
 appherder rollback foo 1.2.3   # or restore a specific saved version
 ```
 
 AppHerder keeps the last few versions of each app and saves the current one whenever an install or upgrade replaces it.
 
-Coming from another AppImage tool? `appherder migrate` adopts the ones in `~/AppImages` and clears out launchers whose AppImage is gone.
+Coming from another AppImage tool? `appherder migrate` adopts the apps in `~/AppImages` and manages them for you.
 
 ## Verified updates
 
-Some AppImages are signed by their publisher. The first time AppHerder installs a signed app, it pins that signing key. From then on, every update must be signed by the same key: an unsigned, tampered, or differently-signed build is refused instead of installed. Changing the trusted key is deliberate, so swapping publishers means uninstalling and reinstalling. Apps that aren't signed keep working as before; the pin only takes effect once a real signature has been seen.
+Some AppImages are signed by their publisher. The first time AppHerder installs a signed app, it pins that signing key. From then on, every update must be signed by the same key: an unsigned, tampered, or differently-signed build is refused. Changing the trusted key is deliberate, so swapping publishers means uninstalling and reinstalling. Apps that aren't signed keep working as before; the pin only takes effect once a real signature has been seen.
 
 `appherder list` shows each app's status in the **SIGNATURE** column: `pinned` (key locked in), `signed` (carries a signature appherder hasn't pinned yet), or `none`.
 

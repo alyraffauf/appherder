@@ -36,6 +36,13 @@ url = "https://example.com/MyApp-latest.AppImage"
 | `max_saved_versions` | int | `3` | Number of prior versions kept for rollback. |
 | `bin_dir` | string | `~/.local/bin` | Directory for `appherder link` symlinks. |
 
+Note that if you change `appimages_dir` or `bin_dir` you will need to regenerate the systemd units that make AppHerder automatic:
+
+```bash
+appherder autosync
+appherder autoupgrade
+```
+
 ## Source overrides
 
 The `[sources]` table overrides the update source for an app, taking priority over the embedded `.upd_info` ELF section. The key is the app name (the filename without `.appimage`).
