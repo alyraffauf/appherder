@@ -20,9 +20,8 @@ func (a App) install(ctx context.Context, appimage string, want expectedChecksum
 		return "", fmt.Errorf("resolve AppImage path %q: %w", appimage, err)
 	}
 
-	// Verify before openAppImage: the DwarFS fallback executes the AppImage to
-	// extract it, so bad images must be refused first. Pinned-key check is
-	// deferred until the app name is known from the desktop file inside.
+	// Verify before openAppImage, because DwarFS extraction executes the AppImage.
+	// Defer pinned-key checks until the desktop file reveals the app name.
 	fingerprint, err := verifyAppImage(appimage, "", want)
 	if err != nil {
 		return "", err
@@ -49,7 +48,6 @@ func (a App) install(ctx context.Context, appimage string, want expectedChecksum
 	icon := resolveIcon(fsys)
 	appName = deriveAppName(desktop, desktopName, appimage)
 
-	// Pinned-key check deferred from above; app name now known.
 	pinned := a.pinnedSigningKey(appName)
 	if pinned != "" {
 		if fingerprint == "" {
@@ -72,8 +70,7 @@ func (a App) install(ctx context.Context, appimage string, want expectedChecksum
 		iconPath = preparedIcon.path
 	}
 
-	// No desktop file inside the AppImage: synthesize a terminal launcher so
-	// CLI apps still get a menu entry and are tracked by managedApps.
+	// CLI AppImages often omit desktop files; synthesize one so Sync can track them.
 	if desktop == nil {
 		desktop = desktopfile.Parse([]byte(fmt.Sprintf(
 			"[Desktop Entry]\nType=Application\nName=%s\nTerminal=true\n",
@@ -81,7 +78,7 @@ func (a App) install(ctx context.Context, appimage string, want expectedChecksum
 		)))
 	}
 
-	// Patch in memory before any filesystem writes so a failure here installs nothing.
+	// Patch before filesystem writes so a failure installs nothing.
 	if err := a.patchDesktopFile(desktop, appName, iconPath); err != nil {
 		return "", err
 	}
@@ -89,7 +86,6 @@ func (a App) install(ctx context.Context, appimage string, want expectedChecksum
 		desktop.Set(desktopEntrySection, desktopSigningKey, pin)
 	}
 
-	// Roll back written files on a later failure rather than leaving a half-installed app.
 	var installed []string
 	rollback := func() {
 		for _, path := range installed {
@@ -113,9 +109,7 @@ func (a App) install(ctx context.Context, appimage string, want expectedChecksum
 	}
 	installed = append(installed, dest)
 
-	// Materialize the AppImage last: when the source is already in ~/AppImages
-	// it gets moved, so an earlier failure must not roll back over the user's
-	// file.
+	// Install the AppImage last so earlier failures never remove the user's source file.
 	if _, err := a.installAppImage(appimage, appName); err != nil {
 		rollback()
 		return "", err

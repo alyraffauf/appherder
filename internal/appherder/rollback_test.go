@@ -103,13 +103,13 @@ func TestRollbackSavesCurrentVersionBeforeRestoring(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Current should now be "old"
+	// The restored version becomes current.
 	got, _ := os.ReadFile(current)
 	if string(got) != "old" {
 		t.Fatalf("current = %q, want old", string(got))
 	}
 
-	// Previous current should be saved; the restored version moves to active.
+	// The previous current file is saved as the only remaining version.
 	entries, _ := os.ReadDir(versionsDir)
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 saved version (pre-rollback current), got %d", len(entries))

@@ -8,8 +8,7 @@ import (
 )
 
 // staticURLSource tracks a fixed URL that always serves the latest AppImage.
-// There's no version or checksum, so freshness leans on the server's
-// Last-Modified (vs. the installed file's mtime), then Content-Length.
+// Without a version or checksum, freshness uses Last-Modified, then Content-Length.
 type staticURLSource struct {
 	url string
 }
@@ -39,8 +38,8 @@ func (s staticURLSource) Latest(ctx context.Context) (Release, error) {
 	return rel, nil
 }
 
-// probe reads the URL's headers via HEAD, falling back to GET for servers that
-// reject it. The caller closes the body; we never read it.
+// probe reads headers with HEAD, falling back to GET for servers that reject it.
+// The caller closes the response body.
 func (s staticURLSource) probe(ctx context.Context) (*http.Response, error) {
 	for _, method := range []string{http.MethodHead, http.MethodGet} {
 		req, err := http.NewRequestWithContext(ctx, method, s.url, nil)

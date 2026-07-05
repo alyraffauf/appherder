@@ -99,7 +99,7 @@ func fileSystemOffset(file io.ReaderAt) (int64, error) {
 		return 0, errors.New("not an AppImage (missing ELF header)")
 	}
 
-	// Byte 8-10: AppImage type. 1 = ISO 9660 (unsupported), 2 = appended filesystem.
+	// Type-1 AppImages use ISO 9660 instead of an appended filesystem.
 	if header[8] == 'A' && header[9] == 'I' && header[10] == 1 {
 		return 0, errors.New("type-1 AppImages are not supported")
 	}
@@ -109,7 +109,7 @@ func fileSystemOffset(file io.ReaderAt) (int64, error) {
 		endian = binary.BigEndian
 	}
 
-	// e_shoff + e_shnum * e_shentsize = end of the section header table.
+	// The payload starts after the section header table.
 	switch header[4] {
 	case 1: // 32-bit
 		tableStart := int64(endian.Uint32(header[32:36]))

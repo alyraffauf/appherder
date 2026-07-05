@@ -36,7 +36,7 @@ func (s gitlabReleaseSource) Latest(ctx context.Context) (Release, error) {
 	if base == "" {
 		base = "https://" + s.host
 	}
-	// The project path goes in one segment, so its slashes must be encoded.
+	// Encode slashes because GitLab expects the project path in one segment.
 	endpoint := fmt.Sprintf("%s/api/v4/projects/%s/releases/", base, url.PathEscape(s.project))
 	if s.tag == "" || s.tag == "latest" {
 		endpoint += "permalink/latest"
@@ -69,8 +69,7 @@ func (s gitlabReleaseSource) Latest(ctx context.Context) (Release, error) {
 	}
 	out := Release{Version: rel.TagName, URL: linkURL(asset)}
 
-	// No digest from the API: take the checksum from the sibling .zsync asset
-	// when present, else comparison falls back to size.
+	// GitLab release links have no digest; sibling .zsync assets carry SHA-1.
 	if zsyncLink, ok := findLink(rel.Assets.Links, asset.Name+".zsync"); ok {
 		header, err := fetchZsyncHeader(ctx, linkURL(zsyncLink))
 		if err != nil {
@@ -93,7 +92,7 @@ func findLink(links []glLink, name string) (glLink, bool) {
 	return glLink{}, false
 }
 
-// linkURL prefers the permalinked direct_asset_url, falling back to the raw url.
+// linkURL prefers GitLab's permalinked asset URL.
 func linkURL(link glLink) string {
 	if link.DirectAssetURL != "" {
 		return link.DirectAssetURL

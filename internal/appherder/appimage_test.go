@@ -350,7 +350,7 @@ func TestSaveToVersionsPrunesOldestVersions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Seed 3 existing versions with distinct mtimes.
+	// Seed existing versions with distinct mtimes.
 	t1 := time.Now().Add(-3 * time.Hour)
 	t2 := time.Now().Add(-2 * time.Hour)
 	t3 := time.Now().Add(-1 * time.Hour)
@@ -372,7 +372,7 @@ func TestSaveToVersionsPrunesOldestVersions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Saving a 4th version should prune v1 (oldest)
+	// Saving another version prunes v1, the oldest.
 	if err := a.saveToVersions(current, "foo"); err != nil {
 		t.Fatal(err)
 	}

@@ -42,7 +42,7 @@ type expectedChecksum struct {
 
 func (c expectedChecksum) set() bool { return c.hex != "" }
 
-// matches reports whether the bytes fed to c.hasher hash to the advertised value.
+// matches reports whether c.hasher matches the advertised checksum.
 func (c expectedChecksum) matches() bool {
 	return strings.EqualFold(hex.EncodeToString(c.hasher.Sum(nil)), c.hex)
 }
@@ -62,8 +62,7 @@ func sectionData(f *elf.File, name string) (data []byte, span byteRange, ok bool
 	return bytes.TrimRight(data, "\x00"), byteRange{int64(section.Offset), int64(section.Size)}, true, nil
 }
 
-// readSignatureSections returns the .sha256_sig and .sig_key contents and the
-// byte ranges they occupy, which the signing digest zeroes.
+// readSignatureSections returns the signature sections and their file spans.
 func readSignatureSections(file string) (sig, key []byte, zero []byteRange, err error) {
 	elfFile, err := elf.Open(file)
 	if err != nil {
@@ -149,8 +148,6 @@ func verifyAppImage(file, pinned string, want expectedChecksum) (fingerprint str
 	}
 	signed := len(bytes.TrimSpace(sig)) > 0
 
-	// Single read pass: hash only what we check. rawHash takes the unmodified
-	// bytes for the checksum, signHash the section-zeroed bytes for the digest.
 	var rawHash, signHash hash.Hash
 	if want.set() {
 		rawHash = want.hasher

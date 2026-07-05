@@ -22,8 +22,8 @@ import (
 type Release struct {
 	Version string    // human label, e.g. a release tag
 	URL     string    // download URL for the AppImage
-	SHA256  string    // hex sha256 of the asset, "" when unavailable
-	SHA1    string    // hex sha1 (zsync's hash), "" when unavailable
+	SHA256  string    // hex-encoded SHA-256, "" when unavailable
+	SHA1    string    // hex-encoded zsync SHA-1, "" when unavailable
 	Size    int64     // content length, 0 when unavailable
 	ModTime time.Time // server Last-Modified, for checksumless sources
 }
@@ -55,8 +55,6 @@ func (r Release) localMatches(file string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	// No checksum: current if the install is at least as new as the server's
-	// copy, else fall back to size.
 	if !r.ModTime.IsZero() {
 		return !info.ModTime().Before(r.ModTime), nil
 	}
@@ -148,13 +146,12 @@ func sourceFromELF(file string) (Source, error) {
 	return parseUpdateInfo(info)
 }
 
-// parseUpdateInfo turns an AppImage update-info string (the "type|a|b|..." form)
+// parseUpdateInfo turns an AppImage update-info string ("type|arg|arg|...")
 // into a concrete source.
 func parseUpdateInfo(info string) (Source, error) {
 	fields := strings.Split(info, "|")
 	switch fields[0] {
 	case "gh-releases-zsync", "gh-releases-direct":
-		// gh-releases-zsync|owner|repo|tag|pattern.zsync
 		if len(fields) != 5 {
 			return nil, fmt.Errorf("malformed GitHub update info %q", info)
 		}
@@ -165,7 +162,6 @@ func parseUpdateInfo(info string) (Source, error) {
 			pattern: strings.TrimSuffix(fields[4], ".zsync"),
 		}, nil
 	case "gl-releases-zsync", "gl-releases-direct":
-		// gl-releases-zsync|host|project|tag|pattern.zsync (our convention)
 		if len(fields) != 5 {
 			return nil, fmt.Errorf("malformed GitLab update info %q", info)
 		}
@@ -176,13 +172,11 @@ func parseUpdateInfo(info string) (Source, error) {
 			pattern: strings.TrimSuffix(fields[4], ".zsync"),
 		}, nil
 	case "zsync":
-		// zsync|https://host/path/App-latest.AppImage.zsync
 		if len(fields) != 2 || fields[1] == "" {
 			return nil, fmt.Errorf("malformed zsync update info %q", info)
 		}
 		return zsyncURLSource{url: fields[1]}, nil
 	case "static":
-		// static|https://host/App-latest.AppImage (our convention)
 		if len(fields) != 2 || fields[1] == "" {
 			return nil, fmt.Errorf("malformed static update info %q", info)
 		}
@@ -219,7 +213,8 @@ func matchByName[T any](items []T, pattern string, name func(T) string, kind str
 	return matches[0], nil
 }
 
-const apiResponseLimit = 4 * 1024 * 1024 // 4 MiB; real API responses are a few KB
+// apiResponseLimit protects JSON and zsync parsers from unexpectedly large responses.
+const apiResponseLimit = 4 * 1024 * 1024
 
 // decodeJSON decodes a JSON value from r, wrapping any error with desc.
 func decodeJSON[T any](r io.Reader, desc string) (T, error) {

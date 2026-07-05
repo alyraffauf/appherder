@@ -35,8 +35,7 @@ const (
 	downloadIdleTimeout = 60 * time.Second
 )
 
-// idleTimeoutReader cancels via cancel() when a single Read stalls longer than
-// timeout, guarding a download against a connection that goes quiet.
+// idleTimeoutReader cancels stalled downloads without limiting total duration.
 type idleTimeoutReader struct {
 	reader  io.Reader
 	timer   *time.Timer
@@ -56,9 +55,8 @@ func (t *idleTimeoutReader) Read(buf []byte) (int, error) {
 	return bytesRead, err
 }
 
-// httpGetOK sends a GET request and returns the response when the server
-// returns 200, closing the body and returning an error otherwise. customize
-// may set headers before the request is sent. The caller closes resp.Body.
+// httpGetOK returns a 200 response, closing the body before returning errors.
+// customize may add request headers. The caller closes resp.Body on success.
 func httpGetOK(ctx context.Context, url, desc string, customize func(*http.Request)) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

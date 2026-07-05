@@ -42,8 +42,7 @@ func (s zsyncURLSource) Latest(ctx context.Context) (Release, error) {
 	return rel, nil
 }
 
-// fetchZsyncHeader downloads a .zsync control file and returns its parsed
-// header. Reused wherever a checksum can be read from a sibling .zsync asset.
+// fetchZsyncHeader returns the parsed header from a .zsync control file.
 func fetchZsyncHeader(ctx context.Context, zsyncURL string) (map[string]string, error) {
 	ctx, cancel := context.WithTimeout(ctx, apiTimeout)
 	defer cancel()
@@ -62,15 +61,14 @@ func fetchZsyncHeader(ctx context.Context, zsyncURL string) (map[string]string, 
 	return header, nil
 }
 
-// parseZsyncHeader reads a .zsync file's text header: "Key: Value" lines ending
-// at the blank line that separates them from the binary checksum block. Keys
-// are lowercased. It stops at the blank line so the body isn't consumed.
+// parseZsyncHeader reads "Key: Value" lines until the binary checksum block.
+// Header keys are lowercased.
 func parseZsyncHeader(reader io.Reader) (map[string]string, error) {
 	header := make(map[string]string)
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if line == "" { // header ends; binary data follows
+		if line == "" {
 			break
 		}
 		key, value, ok := strings.Cut(line, ":")
