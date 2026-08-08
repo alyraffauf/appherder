@@ -41,7 +41,7 @@ jobs:
             }
           '
 
-          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/bin AppDir/usr/lib
 
           # Copy the real Go binary, not the Nix PATH wrapper.
           if [ -x result-appherder/bin/.appherder-wrapped ]; then
@@ -65,7 +65,27 @@ jobs:
           in
             pkgs.dwarfs
           '
-          install -Dm755 result-dwarfs/bin/dwarfsextract AppDir/usr/bin/dwarfsextract
+          install -Dm755 result-dwarfs/bin/dwarfsextract AppDir/usr/bin/dwarfsextract.bin
+
+          # dwarfsextract is dynamically linked. Bundle its complete runtime
+          # closure, rather than relying on libraries in the build machine's
+          # Nix store or on the host system.
+          while IFS= read -r library; do
+            install -Dm755 "$library" "AppDir/usr/lib/$(basename "$library")"
+          done < <(ldd result-dwarfs/bin/dwarfsextract | awk '/=> \/[^ ]+/ { print $3 }')
+
+          extractor_loader="$(readelf -l result-dwarfs/bin/dwarfsextract | awk '/Requesting program interpreter/ { gsub(/[][]/, "", $NF); print $NF }')"
+          install -Dm755 "$extractor_loader" AppDir/usr/lib/ld-linux-x86-64.so.2
+
+          cat > AppDir/usr/bin/dwarfsextract << 'EOF'
+          #!/bin/sh
+          HERE="$(dirname "$(readlink -f "$0")")"
+          exec "$HERE/../lib/ld-linux-x86-64.so.2" \
+            --library-path "$HERE/../lib" \
+            "$HERE/dwarfsextract.bin" "$@"
+          EOF
+          chmod +x AppDir/usr/bin/dwarfsextract
+
           test "$(PATH="$PWD/AppDir/usr/bin:$PATH" command -v dwarfsextract)" = "$PWD/AppDir/usr/bin/dwarfsextract"
           AppDir/usr/bin/dwarfsextract --help >/dev/null
 
