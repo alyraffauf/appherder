@@ -21,4 +21,5 @@ buildGoModule {
   postInstall = ''
     wrapProgram $out/bin/appherder --prefix PATH : ${lib.makeBinPath [dwarfs]}
   '';
+  meta.mainProgram = "appherder";
 }
