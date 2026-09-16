@@ -1,6 +1,7 @@
 {
   buildGoModule,
   glib,
+  gobject-introspection,
   gtk4,
   lib,
   libadwaita,
@@ -13,7 +14,7 @@ in
     pname = "appherder-gui";
     inherit version;
     src = ./.;
-    vendorHash = "sha256-YoNtqb5dflJNCZBstAQxP458ktpUighC8uYuqFWjTyo=";
+    vendorHash = "sha256-hrqRutMJw96V61AKoyt4Oqya8STeGYlF5phb6O35L8Q=";
     subPackages = ["cmd/appherder-gui"];
     tags = ["gtk"];
     ldflags = ["-X main.version=${version}"];
@@ -25,6 +26,7 @@ in
 
     buildInputs = [
       glib
+      gobject-introspection
       gtk4
       libadwaita
     ];

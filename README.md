@@ -56,6 +56,36 @@ nix run github:alyraffauf/appherder
 
 Or `nix profile install github:alyraffauf/appherder` to keep it around.
 
+For Home Manager, add AppHerder to your flake inputs:
+
+```nix
+inputs.appherder = {
+  url = "github:alyraffauf/appherder";
+  inputs.nixpkgs.follows = "nixpkgs";
+};
+```
+
+Then add the module to your Home Manager configuration:
+
+```nix
+modules = [
+  inputs.appherder.homeModules.default
+  {
+    programs.appherder.enable = true;
+
+    # Optional: watch ~/AppImages and sync launchers.
+    services.appherder.enable = true;
+
+    # Optional: check for upgrades every 24 hours.
+    services.appherder.upgrade.enable = true;
+  }
+];
+```
+
+The program module installs AppHerder and creates `~/AppImages` and its writable
+support directories. The service options control sync and upgrades separately.
+Both services remain disabled unless you enable them.
+
 ### Build from source
 
 Requires Go 1.25+.
