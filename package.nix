@@ -1,11 +1,12 @@
 {
   buildGoModule,
+  callPackage,
   dwarfs,
   lib,
   makeWrapper,
   version ? "dev",
 }:
-buildGoModule {
+(buildGoModule.override {go = callPackage ./go.nix {};}) {
   pname = "appherder";
   inherit version;
   src = ./.;

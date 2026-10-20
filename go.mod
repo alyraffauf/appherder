@@ -1,6 +1,6 @@
 module github.com/alyraffauf/appherder
 
-go 1.25.0
+go 1.27.3
 
 require (
 	github.com/CalebQ42/squashfs v1.4.1

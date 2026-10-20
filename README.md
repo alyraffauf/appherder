@@ -88,7 +88,7 @@ Both services remain disabled unless you enable them.
 
 ### Build from source
 
-Requires Go 1.25+.
+Requires Go 1.27.3 or newer.
 
 ```bash
 git clone https://github.com/alyraffauf/appherder.git

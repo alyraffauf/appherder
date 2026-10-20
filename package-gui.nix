@@ -1,5 +1,6 @@
 {
   buildGoModule,
+  callPackage,
   glib,
   gobject-introspection,
   gtk4,
@@ -10,7 +11,7 @@
 }: let
   version = "dev";
 in
-  buildGoModule {
+  (buildGoModule.override {go = callPackage ./go.nix {};}) {
     pname = "appherder-gui";
     inherit version;
     src = ./.;

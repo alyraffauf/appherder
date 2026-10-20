@@ -10,13 +10,13 @@ _: {
         (with pkgs; [
           dwarfs
           glib
-          go
           gobject-introspection
           gtk4
           just
           libadwaita
           pkg-config
         ])
+        ++ [(pkgs.callPackage ../go.nix {})]
         ++ lib.attrValues config.treefmt.build.programs;
 
       shellHook = ''
